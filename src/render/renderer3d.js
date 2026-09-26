@@ -19,6 +19,9 @@ const TERRAIN_3D = { grass: '#7AAE49', plains: '#B8AF58', desert: '#E0CA8A', mou
 const SKIN = '#E0B28A';
 const FOV = 32;
 
+// 0 for no walls, then 1 Walls, 2 Castle, 3 Star Fort.
+const wallLevel = (c) => ['walls', 'castle', 'starfort'].filter((b) => c.buildings.includes(b)).length;
+
 function tileBase(t) {
   if (t.t === 'ocean') return -0.3;
   if (t.t === 'coast') return -0.14;
@@ -720,7 +723,7 @@ export class Renderer3D {
       ownSig += `${t.owner},`;
     }
     let citySig = '';
-    for (const c of Object.values(s.cities)) citySig += `${c.id}:${c.owner}:${c.pop}:${c.name}:${c.capital}:${c.buildings.includes('walls')}:${Math.round(c.hp)};`;
+    for (const c of Object.values(s.cities)) citySig += `${c.id}:${c.owner}:${c.pop}:${c.name}:${c.capital}:${wallLevel(c)}:${Math.round(c.hp)};`;
     const fogChanged = w.sig.fog !== fogSig;
     if (fogChanged) this.applyFog(fog);
     if (fogChanged || w.sig.feat !== featSig || w.sig.city !== citySig || w.sig.own !== ownSig) this.buildDynamic(fog);
@@ -778,8 +781,10 @@ export class Renderer3D {
     const bodies = [];
     const roofs = [];
     const walls = [];
+    const cyls = [];
     const farms = [];
     const mines = [];
+    const mills = [];
     const addBuilding = (list, rlist, x, y, z, bw, bh, bd, rot, color, roofColor, roofH, tile) => {
       list.push({ x, y, z, sx: bw, sy: bh, sz: bd, rot, color, tile });
       rlist.push({ x, y: y + bh, z, sx: bw * 1.18, sy: roofH, sz: bd * 1.18, rot, color: roofColor, tile });
@@ -792,12 +797,30 @@ export class Renderer3D {
       if (t.district) {
         const r = seeded(i * 31 + 7);
         const roofColor = DISTRICT_COLORS[t.district];
-        const spots = [[-0.28, -0.12], [0.24, -0.2], [0.02, 0.26], [-0.32, 0.3], [0.36, 0.22]];
-        spots.forEach(([ox, oz], k) => {
-          const bw = 0.2 + r() * 0.1;
-          const bh = (k === 1 ? 0.34 : 0.14) + r() * 0.12;
-          addBuilding(bodies, roofs, cx + ox, cy - 0.02, cz + oz, bw, bh, bw * (0.8 + r() * 0.4), r() * 0.6, '#EFE7D5', roofColor, 0.12, i);
-        });
+        if (t.district === 'harbor') {
+          // A wooden pier on the water with a warehouse and a crane.
+          bodies.push({ x: cx, y: -0.05, z: cz, sx: 0.95, sy: 0.09, sz: 0.3, rot: 0.5, color: '#8A6A48', tile: i });
+          bodies.push({ x: cx + 0.12, y: -0.05, z: cz + 0.2, sx: 0.22, sy: 0.09, sz: 0.5, rot: 0.5, color: '#7B5D3E', tile: i });
+          addBuilding(bodies, roofs, cx - 0.2, 0.04, cz - 0.02, 0.26, 0.16, 0.2, 0.5, '#EFE7D5', roofColor, 0.1, i);
+          bodies.push({ x: cx + 0.28, y: 0.04, z: cz - 0.16, sx: 0.04, sy: 0.5, sz: 0.04, rot: 0, color: '#5B4A3A', tile: i });
+          bodies.push({ x: cx + 0.2, y: 0.52, z: cz - 0.16, sx: 0.36, sy: 0.035, sz: 0.035, rot: 0.5, color: '#5B4A3A', tile: i });
+        } else {
+          const spots = [[-0.28, -0.12], [0.24, -0.2], [0.02, 0.26], [-0.32, 0.3], [0.36, 0.22]];
+          spots.forEach(([ox, oz], k) => {
+            if (t.district === 'theater' && k === 2) return;
+            const bw = 0.2 + r() * 0.1;
+            const bh = (k === 1 ? 0.34 : 0.14) + r() * 0.12;
+            addBuilding(bodies, roofs, cx + ox, cy - 0.02, cz + oz, bw, bh, bw * (0.8 + r() * 0.4), r() * 0.6, '#EFE7D5', roofColor, 0.12, i);
+          });
+          // Landmarks: smokestacks for industry, an open-air stage for theater.
+          if (t.district === 'industrial') {
+            cyls.push({ x: cx + 0.02, y: cy - 0.02, z: cz - 0.02, sx: 0.05, sy: 0.62, sz: 0.05, color: '#7A4A3A', tile: i });
+            cyls.push({ x: cx - 0.1, y: cy - 0.02, z: cz + 0.08, sx: 0.04, sy: 0.5, sz: 0.04, color: '#6A4032', tile: i });
+          } else if (t.district === 'theater') {
+            cyls.push({ x: cx + 0.02, y: cy - 0.03, z: cz + 0.22, sx: 0.24, sy: 0.08, sz: 0.24, color: '#D8CDB4', tile: i });
+            cyls.push({ x: cx + 0.02, y: cy - 0.01, z: cz + 0.22, sx: 0.15, sy: 0.08, sz: 0.15, color: '#9B7FB8', tile: i });
+          }
+        }
         const badge = this.sprite(`district:${t.district}`, 44, 44, (ctx) => {
           ctx.fillStyle = DISTRICT_COLORS[t.district];
           ctx.beginPath();
@@ -812,6 +835,7 @@ export class Renderer3D {
         w.dyn.add(badge);
       } else if (t.imp === 'farm') farms.push({ i, cx, cy, cz });
       else if (t.imp === 'mine') mines.push({ i, cx, cy, cz });
+      else if (t.imp === 'lumbermill') mills.push({ i, cx, cy, cz });
       if (t.res && !t.district && !cityAt(s, i)) {
         const sp = this.sprite(`res:${t.res}`, 24, 24, (ctx) => drawResource(ctx, t.res, 12, 12, 10.5), { dim: dim(i), depthTest: true });
         sp.position.set(cx + 0.46, cy + 0.2, cz + 0.36);
@@ -835,12 +859,15 @@ export class Renderer3D {
       }
       const towerH = c.capital ? 0.62 : 0.4;
       addBuilding(bodies, roofs, cx, cy - 0.02, cz - 0.02, 0.2, towerH, 0.2, 0.2, '#E8DDC4', c.capital ? '#D9A93A' : roofColor, 0.2, c.tile);
-      if (c.buildings.includes('walls')) {
+      const lvl = wallLevel(c);
+      if (lvl) {
+        // Walls, then taller Castle walls, then a Star Fort's darker, thicker ramparts.
+        const stone = lvl === 3 ? ['#8C8577', '#7A7366'] : ['#A69E8C', '#978F7E'];
         for (let k = 0; k < 6; k++) {
           const [ax, az] = corner(cx, cz, 0.9, k);
           const [bx, bz] = corner(cx, cz, 0.9, (k + 1) % 6);
-          walls.push({ x: (ax + bx) / 2, y: cy - 0.05, z: (az + bz) / 2, sx: 0.9, sy: 0.14, sz: 0.07, rot: -Math.atan2(bz - az, bx - ax), color: '#A69E8C', tile: c.tile });
-          walls.push({ x: ax, y: cy - 0.05, z: az, sx: 0.12, sy: 0.22, sz: 0.12, rot: 0, color: '#978F7E', tile: c.tile });
+          walls.push({ x: (ax + bx) / 2, y: cy - 0.05, z: (az + bz) / 2, sx: 0.9, sy: 0.1 + lvl * 0.05, sz: 0.05 + lvl * 0.025, rot: -Math.atan2(bz - az, bx - ax), color: stone[0], tile: c.tile });
+          walls.push({ x: ax, y: cy - 0.05, z: az, sx: 0.1 + lvl * 0.03, sy: 0.16 + lvl * 0.07, sz: 0.1 + lvl * 0.03, rot: lvl === 3 ? Math.PI / 4 : 0, color: stone[1], tile: c.tile });
         }
       }
       const banner = this.cityBanner(c, dim(c.tile));
@@ -867,6 +894,7 @@ export class Renderer3D {
     instanced(this.geo.box, bodies);
     instanced(this.geo.roof, roofs);
     instanced(this.geo.box, walls);
+    instanced(this.geo.cyl, cyls);
 
     if (farms.length) {
       const m = new THREE.InstancedMesh(this.geo.plane, this.mat('farm', () => new THREE.MeshLambertMaterial({ map: this.farmTex, transparent: true, polygonOffset: true, polygonOffsetFactor: -2 })), farms.length);
@@ -884,6 +912,14 @@ export class Renderer3D {
       mines.forEach((f) => {
         list.push({ x: f.cx + 0.22, y: f.cy - 0.04, z: f.cz + 0.12, sx: 0.26, sy: 0.16, sz: 0.2, rot: 0.3, color: '#4A3F36', tile: f.i });
         list.push({ x: f.cx - 0.12, y: f.cy - 0.05, z: f.cz + 0.22, sx: 0.16, sy: 0.12, sz: 0.16, rot: 0.8, color: '#9C8F7C', tile: f.i });
+      });
+      instanced(this.geo.box, list);
+    }
+    if (mills.length) {
+      const list = [];
+      mills.forEach((f) => {
+        for (let k = 0; k < 3; k++) list.push({ x: f.cx + 0.2, y: f.cy - 0.02 + k * 0.05, z: f.cz + 0.18 + (k % 2) * 0.03, sx: 0.3, sy: 0.05, sz: 0.1, rot: 0.4, color: k % 2 ? '#8A5E3B' : '#9C6C44', tile: f.i });
+        list.push({ x: f.cx - 0.18, y: f.cy - 0.03, z: f.cz + 0.24, sx: 0.2, sy: 0.14, sz: 0.16, rot: 0.4, color: '#6E5238', tile: f.i });
       });
       instanced(this.geo.box, list);
     }
@@ -1158,8 +1194,19 @@ export class Renderer3D {
       b.castShadow = hd.castShadow = true;
       g.add(b, hd);
     };
-    const cls = UNITS[u.type].cls;
-    if (u.type === 'settler') {
+    const def = UNITS[u.type];
+    const model = def.model || 'squad';
+    const metal = this.lambert('#3C4046');
+    const wheels = (spots) => {
+      for (const [x, z] of spots) {
+        const wh = new THREE.Mesh(this.geo.wheel, this.lambert('#3E2F22'));
+        wh.scale.set(0.02, 0.05, 0.05);
+        wh.rotation.y = Math.PI / 2;
+        wh.position.set(x, 0.05, z);
+        g.add(wh);
+      }
+    };
+    if (model === 'settler') {
       const cart = new THREE.Mesh(this.geo.box, wood);
       cart.scale.set(0.26, 0.08, 0.14);
       cart.position.set(0.05, 0.04, 0);
@@ -1177,14 +1224,14 @@ export class Renderer3D {
       cart.castShadow = top.castShadow = true;
       g.add(cart, top);
       pawn(-0.16, 0.02, 0.9, this.lambert('#C9B48A'));
-    } else if (u.type === 'builder') {
+    } else if (model === 'builder') {
       pawn(0, 0, 1, this.lambert('#C9B48A'));
       const tool = new THREE.Mesh(this.geo.cyl, wood);
       tool.scale.set(0.01, 0.22, 0.01);
       tool.rotation.z = -0.5;
       tool.position.set(0.05, 0.06, 0);
       g.add(tool);
-    } else if (u.type === 'catapult') {
+    } else if (model === 'siege') {
       const base = new THREE.Mesh(this.geo.box, wood);
       base.scale.set(0.3, 0.07, 0.18);
       base.position.y = 0.05;
@@ -1202,7 +1249,51 @@ export class Renderer3D {
       base.castShadow = arm.castShadow = true;
       g.add(base, arm);
       pawn(0.2, 0.12, 0.85);
-    } else if (u.type === 'horseman') {
+    } else if (model === 'cannon') {
+      const carriage = new THREE.Mesh(this.geo.box, wood);
+      carriage.scale.set(0.2, 0.06, 0.12);
+      carriage.position.set(0, 0.04, 0);
+      const barrel = new THREE.Mesh(this.geo.cyl, metal);
+      barrel.scale.set(0.035, 0.3, 0.035);
+      barrel.rotation.z = -Math.PI / 2 + 0.22;
+      barrel.position.set(-0.08, 0.09, 0);
+      wheels([[-0.02, 0.09], [-0.02, -0.09]]);
+      carriage.castShadow = barrel.castShadow = true;
+      g.add(carriage, barrel);
+      pawn(-0.16, 0.12, 0.85);
+      pawn(-0.18, -0.12, 0.85);
+    } else if (model === 'tank') {
+      const hull = new THREE.Mesh(this.geo.box, body);
+      hull.scale.set(0.34, 0.08, 0.2);
+      hull.position.y = 0.035;
+      hull.castShadow = true;
+      g.add(hull);
+      for (const z of [0.11, -0.11]) {
+        const track = new THREE.Mesh(this.geo.box, metal);
+        track.scale.set(0.36, 0.07, 0.05);
+        track.position.set(0, 0, z);
+        track.castShadow = true;
+        g.add(track);
+      }
+      if (def.cls === 'ranged') {
+        const rack = new THREE.Mesh(this.geo.box, metal);
+        rack.scale.set(0.2, 0.08, 0.14);
+        rack.rotation.z = 0.4;
+        rack.position.set(-0.03, 0.12, 0);
+        rack.castShadow = true;
+        g.add(rack);
+      } else {
+        const turret = new THREE.Mesh(this.geo.box, body);
+        turret.scale.set(0.15, 0.07, 0.13);
+        turret.position.set(-0.02, 0.115, 0);
+        const gun = new THREE.Mesh(this.geo.cyl, metal);
+        gun.scale.set(0.018, 0.22, 0.018);
+        gun.rotation.z = -Math.PI / 2;
+        gun.position.set(0.05, 0.15, 0);
+        turret.castShadow = gun.castShadow = true;
+        g.add(turret, gun);
+      }
+    } else if (model === 'riders') {
       for (const [x, z] of [[-0.12, 0.08], [0.14, -0.06]]) {
         const horse = new THREE.Mesh(this.geo.box, this.lambert('#7B5536'));
         horse.scale.set(0.2, 0.09, 0.07);
@@ -1223,19 +1314,20 @@ export class Renderer3D {
         b.castShadow = true;
         g.add(b, hd);
       }
-    } else if (cls === 'recon') {
+    } else if (model === 'pawn') {
       pawn(0, 0, 1);
     } else {
       pawn(-0.12, 0.08);
       pawn(0.12, 0.08);
       pawn(0, -0.1, 1.1);
-      if (u.type === 'archer' || u.type === 'swordsman' || u.type === 'warrior') {
-        const weapon = new THREE.Mesh(this.geo.cyl, u.type === 'swordsman' ? this.lambert('#C9CED6') : wood);
-        weapon.scale.set(0.012, 0.26, 0.012);
-        weapon.rotation.z = u.type === 'archer' ? 0 : -0.35;
-        weapon.position.set(0.06, 0.02, -0.1);
-        g.add(weapon);
-      }
+      // The leader's weapon tells unit lines apart: club, sword, spear, bow or rifle.
+      const kind = def.glyph;
+      const weapon = new THREE.Mesh(this.geo.cyl, kind === 'swordsman' ? this.lambert('#C9CED6') : kind === 'gun' ? metal : wood);
+      const long = kind === 'spear';
+      weapon.scale.set(0.012, long ? 0.42 : kind === 'gun' ? 0.2 : 0.26, 0.012);
+      weapon.rotation.z = kind === 'archer' ? 0 : long ? -0.12 : kind === 'gun' ? -0.9 : -0.35;
+      weapon.position.set(0.06, long ? 0 : 0.06, -0.1);
+      g.add(weapon);
     }
     const flag = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, depthWrite: false, sizeAttenuation: false, transparent: true }));
     flag.center.set(0.5, 0);

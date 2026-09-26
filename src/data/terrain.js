@@ -22,10 +22,12 @@ export const RESOURCES = {
 export const IMPROVEMENTS = {
   farm: { name: 'Farm', food: 1, tech: null, hint: 'Grassland, plains or desert without hills or forest' },
   mine: { name: 'Mine', prod: 1, tech: 'mining', hint: 'Hills without forest' },
+  lumbermill: { name: 'Lumber Mill', prod: 2, tech: 'machinery', hint: 'Forest tiles' },
 };
 
 export function improvementValid(tile, kind) {
   if (kind === 'farm') return ['grass', 'plains', 'desert'].includes(tile.t) && !tile.hills && !tile.forest;
   if (kind === 'mine') return tile.hills && !tile.forest && tile.t !== 'mountain';
+  if (kind === 'lumbermill') return tile.forest && tile.t !== 'mountain';
   return false;
 }

@@ -13,7 +13,8 @@ import { followPath } from './movement.js';
 import { attackInfo, inRange, resolveAttack, cityStrikeInfo, cityCanStrike, resolveCityStrike } from './combat.js';
 import {
   foundReason, foundCity, assignWorkers, buildReason, sameItem, completeItem, buyCost,
-  borderCandidates, buyTileCost, claimTile, workableTiles, bestDistrictTile,
+  borderCandidates, buyTileCost, claimTile, workableTiles, bestDistrictTile, cityHasStrike,
+  upgradeTarget, upgradeCost,
 } from './city.js';
 import { validDistrictTiles } from './placement.js';
 import { setResearch, techName } from './research.js';
@@ -179,6 +180,28 @@ const HANDLERS = {
     return null;
   },
 
+  upgrade(state, a, ev) {
+    const u = ownUnit(state, a);
+    if (!u) return 'That unit is not yours';
+    const next = UNITS[u.type].upgradesTo;
+    if (!next) return `${UNITS[u.type].name} has no upgrade`;
+    const target = upgradeTarget(state, u);
+    if (!target) return `Needs ${TECHS[UNITS[next].tech].name}`;
+    if (state.map.tiles[u.tile].owner !== u.owner) return 'Units can only upgrade inside your borders';
+    if (u.moves <= 0) return 'This unit has no moves left this turn';
+    const cost = upgradeCost(u.type, target);
+    const p = state.players[a.player];
+    if (p.gold < cost) return `Needs ${cost} gold`;
+    p.gold -= cost;
+    const from = u.type;
+    u.type = target;
+    u.moves = 0;
+    u.acted = true;
+    u.fortified = false;
+    ev.push({ type: 'upgraded', unit: u.id, owner: u.owner, from, to: target, tile: u.tile });
+    return null;
+  },
+
   setProduction(state, a) {
     const c = ownCity(state, a);
     if (!c) return 'That city is not yours';
@@ -276,7 +299,7 @@ const HANDLERS = {
   cityStrike(state, a, ev) {
     const c = ownCity(state, a);
     if (!c) return 'That city is not yours';
-    if (!c.buildings.includes('walls')) return 'Only cities with walls can strike';
+    if (!cityHasStrike(c)) return 'Only cities with walls can strike';
     if (!cityCanStrike(state, c)) return 'This city has already struck this turn';
     if (distance(state.map, c.tile, a.target) > RULES.cityStrikeRange) return 'Out of range';
     const info = cityStrikeInfo(state, c, a.target);

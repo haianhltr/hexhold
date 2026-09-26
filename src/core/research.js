@@ -55,6 +55,7 @@ export function addScience(state, pid, amount, events) {
     } else {
       p.techs.push(key);
       delete p.progress[key];
+      if (TECHS[key].effect?.revealMap) p.explored.fill(1);
     }
     events.push({ type: 'tech', player: pid, tech: key });
     p.researchPath.shift();

@@ -4,11 +4,12 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { TERRAIN, IMPROVEMENTS, RESOURCES, improvementValid } from '../data/terrain.js';
-import { TECHS } from '../data/techs.js';
+import { maxMoves } from '../core/effects.js';
+import { TECHS, eraOf } from '../data/techs.js';
 import { RULES } from '../data/rules.js';
 import { cityAt, unitsAt, owningCity, hasTech, atWar, yearLabel } from '../core/query.js';
 import { playerYields, cityYields, tileYield } from '../core/yields.js';
-import { foundReason, growthThreshold, borderThreshold, buildOptions, turnsLeft, buyCost, itemName, itemCost, cityMaxHp, borderCandidates, buyTileCost } from '../core/city.js';
+import { foundReason, growthThreshold, borderThreshold, buildOptions, turnsLeft, buyCost, itemName, itemCost, cityMaxHp, borderCandidates, buyTileCost, cityHasStrike, upgradeTarget, upgradeCost } from '../core/city.js';
 import { adjacencyBonus, adjacencyReasons, districtLimit } from '../core/placement.js';
 import { techCost, techName, turnsToResearch } from '../core/research.js';
 import { moveCost, passable } from '../core/pathfind.js';
@@ -47,7 +48,7 @@ export function renderTopBar(app) {
       h('span', { class: 'yield y-gold', title: `Gold ${Math.floor(p.gold)}. ${signed(y.goldNet)} per turn after ${y.upkeep} gold of unit upkeep.` },
         h('span', { html: icon('gold') }), h('b', {}, String(Math.floor(p.gold))), hasCities ? h('small', {}, `${signed(y.goldNet)}`) : null)),
     researchEl,
-    h('div', { class: 'tb-turn', title: `Game ends after turn ${s.turnLimit}` }, h('b', {}, `Turn ${s.turn}`), h('small', {}, ` / ${s.turnLimit} · ${yearLabel(s)}`)),
+    h('div', { class: 'tb-turn', title: `Game ends after turn ${s.turnLimit}` }, h('b', {}, `Turn ${s.turn}`), h('small', {}, ` / ${s.turnLimit} · ${yearLabel(s)} · ${eraOf(p.techs).name} Era`)),
     h('nav', { class: 'tb-actions', 'aria-label': 'Game menus' },
       h('button', { type: 'button', class: 'btn ghost', onclick: () => openTechTree(app), title: 'Tech tree (T)' }, 'Tech'),
       h('button', { type: 'button', class: 'btn ghost', onclick: () => openDiplomacy(app), title: 'Diplomacy (P)' }, 'Diplomacy'),
@@ -85,6 +86,13 @@ export function renderUnitPanel(app) {
   if (u.type === 'builder') {
     add('Build farm', null, () => app.unitCommand('improve', { kind: 'farm' }), u.moves <= 0 ? 'No moves left this turn' : improveReason(s, u, 'farm'));
     add('Build mine', null, () => app.unitCommand('improve', { kind: 'mine' }), u.moves <= 0 ? 'No moves left this turn' : improveReason(s, u, 'mine'));
+    if (hasTech(s, u.owner, IMPROVEMENTS.lumbermill.tech)) add('Build lumber mill', null, () => app.unitCommand('improve', { kind: 'lumbermill' }), u.moves <= 0 ? 'No moves left this turn' : improveReason(s, u, 'lumbermill'));
+  }
+  const upTo = upgradeTarget(s, u);
+  if (upTo) {
+    const cost = upgradeCost(u.type, upTo);
+    const why = s.map.tiles[u.tile].owner !== u.owner ? 'Only inside your borders' : u.moves <= 0 ? 'No moves left this turn' : p.gold < cost ? `Needs ${cost} gold` : null;
+    add(`Upgrade to ${UNITS[upTo].name} (${cost} gold)`, 'U', () => app.unitCommand('upgrade'), why, 'primary');
   }
   if (def.cls !== 'civilian') add(u.fortified ? 'Fortified' : 'Fortify', 'F', () => app.unitCommand('fortify'), u.fortified ? 'Already fortified' : null);
   add('Skip turn', 'Space', () => app.unitCommand('skip'));
@@ -104,7 +112,7 @@ export function renderUnitPanel(app) {
   const stats = [];
   if (def.strength) stats.push(h('span', { class: 'stat', title: 'Combat strength' }, h('span', { html: icon('strength') }), h('b', {}, String(def.strength + (u.bonus || 0)))));
   if (def.ranged) stats.push(h('span', { class: 'stat', title: `Ranged strength, range ${def.range}` }, h('span', { class: 'ranged-tag' }, 'R'), h('b', {}, `${def.ranged}`), h('small', {}, ` / ${def.range}`)));
-  stats.push(h('span', { class: 'stat', title: 'Moves left this turn' }, h('span', { html: icon('moves') }), h('b', {}, fmt(u.moves)), h('small', {}, ` / ${def.moves}`)));
+  stats.push(h('span', { class: 'stat', title: 'Moves left this turn' }, h('span', { html: icon('moves') }), h('b', {}, fmt(u.moves)), h('small', {}, ` / ${fmt(maxMoves(s, u))}`)));
   if (u.charges != null) stats.push(h('span', { class: 'stat', title: 'Uses left' }, h('b', {}, String(u.charges)), h('small', {}, ' uses')));
 
   fill(panel, 
@@ -203,7 +211,7 @@ export function renderCityPanel(app) {
   tools.push(h('button', { type: 'button', class: `btn small${app.cityTool === 'citizens' ? ' active' : ''}`, title: 'Click tiles on the map to lock or unlock a citizen there', onclick: () => { app.cityTool = app.cityTool === 'citizens' ? null : 'citizens'; app.refresh(); } }, 'Manage citizens'));
   const canBuy = borderCandidates(s, c).length > 0;
   tools.push(h('button', { type: 'button', class: 'btn small', disabled: !canBuy, title: canBuy ? `Tiles cost ${buyTileCost(s, c)} gold` : 'No tiles to buy', onclick: () => { app.mode = { kind: 'buyTile', city: c.id }; app.refresh(); } }, 'Buy tiles'));
-  if (c.buildings.includes('walls')) {
+  if (cityHasStrike(c)) {
     const vis = visibleTiles(s, app.humanId);
     const targets = within(s.map, c.tile, RULES.cityStrikeRange).some((t) => vis[t] && unitsAt(s, t).some((u) => atWar(s, c.owner, u.owner) && UNITS[u.type].cls !== 'civilian'));
     tools.push(h('button', { type: 'button', class: 'btn small danger', disabled: !cityCanStrike(s, c) || !targets, title: !cityCanStrike(s, c) ? 'Already struck this turn' : targets ? 'Strike an enemy unit within 2 tiles' : 'No enemies in range', onclick: () => { app.mode = { kind: 'strike', city: c.id }; app.refresh(); } }, 'Strike'));
@@ -332,7 +340,7 @@ export function tileTooltip(app, i) {
     const owner = s.players[city.owner];
     const dfn = cityDefense(s, city);
     lines.push(h('div', { class: 'tt-city' }, h('span', { html: emblemSvg(owner.emblem, owner.color, 14) }), h('b', {}, city.name), h('span', { class: 'muted' }, ` · ${owner.name} · pop ${city.pop}`)));
-    lines.push(h('div', { class: 'small muted' }, `Strength ${dfn.total} · ${Math.round(city.hp)}/${cityMaxHp(s, city)} HP${city.buildings.includes('walls') ? ' · walls' : ''}`));
+    lines.push(h('div', { class: 'small muted' }, `Strength ${dfn.total} · ${Math.round(city.hp)}/${cityMaxHp(s, city)} HP${cityHasStrike(city) ? ' · walls' : ''}`));
   } else if (t.district) {
     const reasons = adjacencyReasons(s, i, t.district);
     lines.push(h('div', {}, `${DISTRICTS[t.district].name} district`));

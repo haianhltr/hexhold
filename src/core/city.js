@@ -11,6 +11,7 @@ import { touch, citiesOf, unitsAt, spawnUnit, hasTech, removeUnit } from './quer
 import { tileYield, cityYields } from './yields.js';
 import { validDistrictTiles, districtLimit, districtsUsed, hasDistrict, adjacencyBonus } from './placement.js';
 import { canEnter, passable } from './pathfind.js';
+import { effects } from './effects.js';
 
 export function nextCityName(state, pid) {
   const p = state.players[pid];
@@ -175,12 +176,33 @@ function growBorders(state, city, events) {
 
 export function cityMaxHp(state, city) {
   let hp = RULES.cityHp;
-  if (city.buildings.includes('walls')) {
-    hp += RULES.wallsHp;
-    if (hasTech(state, city.owner, 'construction')) hp += RULES.constructionWallsHp;
-  }
+  for (const b of city.buildings) hp += BUILDINGS[b].defense?.hp || 0;
+  if (city.buildings.includes('walls')) hp += effects(state, city.owner).wallsHp;
   return hp;
 }
+
+export const cityHasStrike = (city) => city.buildings.some((b) => BUILDINGS[b].defense?.strike);
+
+// ---------- unit lines ----------
+
+// A unit type can't be built once its owner knows the tech for the next unit in its line.
+export function isObsoleteUnit(state, pid, type) {
+  const next = UNITS[type].upgradesTo;
+  return !!next && hasTech(state, pid, UNITS[next].tech);
+}
+
+// The best unit this unit can upgrade to right now (skipping steps already researched), or null.
+export function upgradeTarget(state, unit) {
+  let target = null;
+  let next = UNITS[unit.type].upgradesTo;
+  while (next && hasTech(state, unit.owner, UNITS[next].tech)) {
+    target = next;
+    next = UNITS[next].upgradesTo;
+  }
+  return target;
+}
+
+export const upgradeCost = (from, to) => Math.max(10, (UNITS[to].cost - UNITS[from].cost) * 2);
 
 // ---------- production ----------
 
@@ -200,11 +222,15 @@ export function buildReason(state, city, item, inQueue = false) {
   if (!def) return 'Unknown item';
   if (!hasTech(state, city.owner, def.tech)) return `Needs ${TECHS[def.tech].name}`;
   const queued = !inQueue && city.queue.some((q) => sameItem(q, item));
+  if (item.kind === 'unit' && isObsoleteUnit(state, city.owner, item.key)) return `Replaced by ${UNITS[UNITS[item.key].upgradesTo].name}`;
   if (item.kind === 'building') {
     if (city.buildings.includes(item.key)) return 'Already built';
     if (queued) return 'Already in the queue';
     if (def.district && !hasDistrict(state, city, def.district) && !city.queue.some((q) => q.kind === 'district' && q.key === def.district)) {
       return `Needs a ${DISTRICTS[def.district].name}`;
+    }
+    if (def.requires && !city.buildings.includes(def.requires) && !city.queue.some((q) => q.kind === 'building' && q.key === def.requires)) {
+      return `Needs ${BUILDINGS[def.requires].name} first`;
     }
   }
   if (item.kind === 'district') {
@@ -225,7 +251,10 @@ export function buildOptions(state, city) {
   };
   for (const key in DISTRICTS) add('district', key, DISTRICTS[key]);
   for (const key in BUILDINGS) add('building', key, BUILDINGS[key]);
-  for (const key in UNITS) add('unit', key, UNITS[key]);
+  for (const key in UNITS) {
+    if (isObsoleteUnit(state, city.owner, key) && !city.queue.some((q) => q.kind === 'unit' && q.key === key)) continue;
+    add('unit', key, UNITS[key]);
+  }
   return out;
 }
 
@@ -289,7 +318,7 @@ export function completeItem(state, city, item, events) {
     if (tile < 0) return false;
     const unit = spawnUnit(state, city.owner, item.key, tile);
     unit.moves = 0;
-    if (UNITS[item.key].cls === 'melee' && city.buildings.includes('barracks')) unit.bonus = BUILDINGS.barracks.unitBonus;
+    if (isMilitary(item.key)) unit.bonus = city.buildings.reduce((s, b) => s + (BUILDINGS[b].unitBonus || 0), 0);
     if (item.key === 'settler') {
       city.pop--;
       city.food = Math.min(city.food, growthThreshold(city.pop) - 1);
@@ -300,7 +329,7 @@ export function completeItem(state, city, item, events) {
   }
   if (item.kind === 'building') {
     city.buildings.push(item.key);
-    if (item.key === 'walls') city.hp = cityMaxHp(state, city);
+    if (BUILDINGS[item.key].defense) city.hp = cityMaxHp(state, city);
     events.push({ type: 'built', city: city.id, owner: city.owner, item: { ...item } });
     return true;
   }
@@ -338,6 +367,8 @@ export function processCity(state, city, events) {
   }
 
   while (city.queue.length && isObsolete(state, city, city.queue[0])) city.queue.shift();
+  // Queued units that a new tech has replaced turn into their replacement, keeping the progress.
+  for (const q of city.queue) if (q.kind === 'unit' && isObsoleteUnit(state, city.owner, q.key)) q.key = upgradeTarget(state, { type: q.key, owner: city.owner });
   const item = city.queue[0];
   city.prodStock += productionRate(state, city, item, y);
   if (item) {

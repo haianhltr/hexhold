@@ -2,6 +2,12 @@
 
 **Hexhold** is a working title. Rename it any time.
 
+## Update (v1.2.0, 2026-09-26)
+
+The tech tree now has 76 techs in 9 eras, modeled on Civilization VI with Gathering Storm. The reference is [tech-dictionary.md](tech-dictionary.md). It adds unit upgrade lines, tech effects, three new districts, a science victory and a 250-turn Epic length. The details are in CHANGELOG.md.
+
+The soak test checks pacing. On Normal, the leading AI reaches the Renaissance by turn 100 and wins by science between turns 205 and 250, or doesn't finish in time. On Hard, it can launch as early as turn 165.
+
 ## Update (v1.1.0, 2026-09-26)
 
 The map is now 3D (WebGL through Three.js), styled after Civilization VI. The classic 2D map remains under Settings → Map view and switches on automatically without WebGL. The details are in CHANGELOG.md. The browser check covers both maps.

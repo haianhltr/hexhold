@@ -10,12 +10,13 @@ import { unitUpkeep } from './yields.js';
 import { followPath } from './movement.js';
 import { refreshVision } from './vision.js';
 import { checkVictory } from './victory.js';
+import { effects, maxMoves } from './effects.js';
 
 export function startPlayerTurn(state, pid, events) {
   const p = state.players[pid];
   if (!p.alive) return;
   for (const u of unitsOf(state, pid)) {
-    u.moves = UNITS[u.type].moves;
+    u.moves = maxMoves(state, u);
     u.acted = false;
   }
   for (const c of citiesOf(state, pid)) c.struck = false;
@@ -57,7 +58,7 @@ export function endRound(state, events) {
     const city = cityAt(state, u.tile);
     const owner = state.map.tiles[u.tile].owner;
     const heal = city && city.owner === u.owner ? RULES.healCity : owner === u.owner ? RULES.healOwn : RULES.healNeutral;
-    u.hp = Math.min(100, u.hp + heal);
+    u.hp = Math.min(100, u.hp + heal + effects(state, u.owner).heal);
   }
 
   state.turn++;

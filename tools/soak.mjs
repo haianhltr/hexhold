@@ -10,6 +10,9 @@ import { RULES } from '../src/data/rules.js';
 import { passable } from '../src/core/pathfind.js';
 import { citiesOf } from '../src/core/query.js';
 import { score } from '../src/core/victory.js';
+import { eraOf } from '../src/data/techs.js';
+
+const leadEra = (state) => eraOf(state.players.reduce((a, p) => (p.techs.length > a.length ? p.techs : a), [])).name;
 
 const games = Number(process.argv[2] ?? 20);
 const turns = Number(process.argv[3] ?? 150);
@@ -55,6 +58,7 @@ for (let g = 1; g <= games; g++) {
   let slowest = 0;
   let wars = 0;
   let captures = 0;
+  let era100 = '';
   try {
     while (state.phase === 'playing' && state.turn <= turns) {
       const t0 = performance.now();
@@ -62,6 +66,7 @@ for (let g = 1; g <= games; g++) {
       slowest = Math.max(slowest, performance.now() - t0);
       wars += events.filter((e) => e.type === 'war').length;
       captures += events.filter((e) => e.type === 'cityCaptured').length;
+      if (state.turn === 101) era100 = leadEra(state);
       const problems = check(state);
       if (problems.length) throw new Error(`turn ${state.turn}: ${problems.slice(0, 5).join('; ')}`);
     }
@@ -81,6 +86,8 @@ for (let g = 1; g <= games; g++) {
     alive: alive.length,
     cities: state.players.map((p) => citiesOf(state, p.id).length).join('/'),
     techs: state.players.map((p) => p.techs.length).join('/'),
+    era100,
+    era: leadEra(state),
     scores: state.players.map((p) => (p.alive ? score(state, p.id) : '✗')).join('/'),
     wars,
     captures,

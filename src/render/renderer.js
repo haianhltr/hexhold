@@ -509,9 +509,11 @@ export class Renderer {
       ctx.closePath();
       ctx.fill();
     }
-    if (c.buildings.includes('walls')) {
-      ctx.strokeStyle = '#8A8378';
-      ctx.lineWidth = SIZE * 0.08;
+    // Walls, Castle and Star Fort each thicken the wall line.
+    const wallLvl = ['walls', 'castle', 'starfort'].filter((b) => c.buildings.includes(b)).length;
+    if (wallLvl) {
+      ctx.strokeStyle = wallLvl === 3 ? '#76705F' : '#8A8378';
+      ctx.lineWidth = SIZE * (0.05 + wallLvl * 0.035);
       ctx.beginPath();
       ctx.arc(0, SIZE * 0.1, SIZE * 0.72, Math.PI * 0.05, Math.PI * 0.95);
       ctx.stroke();

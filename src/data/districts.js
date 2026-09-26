@@ -1,4 +1,5 @@
 // Districts occupy a tile inside the city's borders. A city may hold 1 district per 3 population.
+// Adjacency rules live in core/placement.js; `water` districts go on coast tiles.
 
 export const DISTRICTS = {
   campus: {
@@ -22,6 +23,28 @@ export const DISTRICTS = {
     yield: null,
     notNextToCenter: true,
     info: 'Military units build 25% faster. Cannot be next to the city center.',
+  },
+  industrial: {
+    name: 'Industrial Zone',
+    cost: 45,
+    tech: 'apprenticeship',
+    yield: 'prod',
+    info: '+1 Production, +1 per adjacent mine, +1 per 2 adjacent districts',
+  },
+  theater: {
+    name: 'Theater Square',
+    cost: 45,
+    tech: 'construction',
+    yield: 'culture',
+    info: '+1 Culture, +1 per 2 adjacent districts',
+  },
+  harbor: {
+    name: 'Harbor',
+    cost: 45,
+    tech: 'celestial',
+    yield: 'gold',
+    water: true,
+    info: 'Built on a coast tile. +1 Gold, +2 next to the city center, +1 per adjacent Fish, +1 per 2 adjacent districts',
   },
 };
 

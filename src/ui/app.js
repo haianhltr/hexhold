@@ -13,7 +13,7 @@ import { attackInfo, inRange, cityStrikeInfo } from '../core/combat.js';
 import { distance, within, neighbors } from '../core/hex.js';
 import { tileYield } from '../core/yields.js';
 import { validDistrictTiles, adjacencyBonus } from '../core/placement.js';
-import { borderCandidates, buyTileCost, workableTiles } from '../core/city.js';
+import { borderCandidates, buyTileCost, workableTiles, upgradeTarget } from '../core/city.js';
 import { allResearched } from '../core/research.js';
 import { visibleTiles } from '../core/vision.js';
 import { RULES } from '../data/rules.js';
@@ -28,7 +28,7 @@ import { renderTopBar, renderUnitPanel, renderCityPanel, renderEndTurn, renderNo
 import { showTitle, openTechTree, openMenu, showGameOver, confirmModal, openHelp, peaceOfferModal, openDiplomacy } from './screens.js';
 import { describeEvent, eventSound } from './events.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 
 export class App {
   constructor(root) {
@@ -416,9 +416,9 @@ export class App {
     const r = this.dispatch({ type, unit: u.id, ...extra });
     if (!r.ok) return;
     if (type === 'found') sfx.found();
-    else if (type === 'improve') sfx.built();
+    else if (type === 'improve' || type === 'upgrade') sfx.built();
     else sfx.click();
-    if (['skip', 'fortify', 'sleep', 'found', 'improve'].includes(type)) this.afterUnitOrder(u.id, true);
+    if (['skip', 'fortify', 'sleep', 'found', 'improve', 'upgrade'].includes(type)) this.afterUnitOrder(u.id, true);
   }
 
   afterUnitOrder(id, done = false) {
@@ -752,11 +752,11 @@ export class App {
 
   // ---------- modals ----------
 
-  openModal(content, { wide = false, label = 'Dialog', onClose = null, closable = true } = {}) {
+  openModal(content, { wide = false, full = false, label = 'Dialog', onClose = null, closable = true } = {}) {
     this.closeModal();
     this.hideTooltip();
     const closeBtn = closable ? h('button', { type: 'button', class: 'modal-close', 'aria-label': 'Close', html: '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>', onclick: () => this.closeModal() }) : null;
-    const dialog = h('div', { class: `modal${wide ? ' wide' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': label }, closeBtn, content);
+    const dialog = h('div', { class: `modal${wide ? ' wide' : ''}${full ? ' full' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': label }, closeBtn, content);
     const backdrop = h('div', { class: 'backdrop', onclick: (e) => { if (e.target === backdrop && closable) this.closeModal(); } }, dialog);
     this.modalRoot.append(backdrop);
     this.modal = { el: backdrop, onClose, closable };
@@ -883,6 +883,9 @@ export class App {
         break;
       case 'b':
         if (u && u.type === 'settler') this.unitCommand('found');
+        break;
+      case 'u':
+        if (u && upgradeTarget(this.state, u)) this.unitCommand('upgrade');
         break;
       case 't':
         openTechTree(this);

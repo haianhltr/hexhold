@@ -23,7 +23,7 @@ import { canEnter } from './pathfind.js';
 import { startPlayerTurn } from './turn.js';
 import { refreshVision } from './vision.js';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 function freeNeighbor(state, owner, type, tile) {
   const probe = { owner, type, id: -1 };
@@ -128,7 +128,21 @@ export function serialize(state) {
 }
 
 // Upgrades older saves. Each entry turns version n into version n + 1.
-const MIGRATIONS = {};
+const MIGRATIONS = {
+  // 1.1 → 1.2: the 76-tech tree. Philosophy is gone (its keys otherwise carry over), and Swordsmen
+  // now need Iron Working, which v1 players reached through Bronze Working.
+  1(s) {
+    for (const p of s.players) {
+      p.techs = p.techs.filter((k) => k !== 'philosophy');
+      delete p.progress.philosophy;
+      p.researchPath = (p.researchPath || []).filter((k) => k !== 'philosophy');
+      if (p.research === 'philosophy') p.research = p.researchPath[0] || null;
+      if (p.techs.includes('bronze') && Object.values(s.units).some((u) => u.owner === p.id && u.type === 'swordsman')) p.techs.push('ironworking');
+    }
+    s.version = 2;
+    return s;
+  },
+};
 
 export function deserialize(text) {
   let s;

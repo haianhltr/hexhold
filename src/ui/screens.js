@@ -2,9 +2,9 @@
 // help, game over, and small confirmation dialogs.
 
 import { CIVS } from '../data/civs.js';
-import { TECHS, TECH_KEYS } from '../data/techs.js';
+import { TECHS, TECH_KEYS, ERAS, ERA_INDEX, eraOf } from '../data/techs.js';
 import { UNITS } from '../data/units.js';
-import { DIFFICULTY, MAP_SIZES, TURN_LIMITS, RULES } from '../data/rules.js';
+import { DIFFICULTY, MAP_SIZES, TURN_LIMITS, TURN_LIMIT_LABELS, RULES } from '../data/rules.js';
 import { atWar, haveMet, citiesOf, yearLabel } from '../core/query.js';
 import { playerYields } from '../core/yields.js';
 import { techCost, techName, canResearchNow, turnsToResearch, researchPath, allResearched } from '../core/research.js';
@@ -16,7 +16,7 @@ import { h, clear, fill, icon, emblemSvg, bar, fmt, YIELD_COLORS } from './dom.j
 import { unlocksOf } from './events.js';
 import { setVolume, sfx, unlockAudio } from './sound.js';
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 
 // ---------- title & setup ----------
 
@@ -81,7 +81,7 @@ export function showSetup(app) {
       group('Map size', 'size', Object.entries(MAP_SIZES).map(([k, v]) => [k, v.label, `${v.w} × ${v.h}`]), () => opts.size, (v) => (opts.size = v)),
       group('Rivals', 'rivals', [[1, '1'], [2, '2'], [3, '3']], () => opts.rivals, (v) => (opts.rivals = Number(v))),
       group('Difficulty', 'difficulty', Object.entries(DIFFICULTY).map(([k, v]) => [k, v.label, k === 'easy' ? 'Relaxed rivals' : k === 'hard' ? 'Rivals get +25% yields' : 'Fair rivals']), () => opts.difficulty, (v) => (opts.difficulty = v)),
-      group('Game length', 'turns', TURN_LIMITS.map((t) => [t, `${t} turns`, t === 60 ? 'About 20 min' : t === 100 ? 'About 40 min' : 'About an hour']), () => opts.turnLimit, (v) => (opts.turnLimit = Number(v)))),
+      group('Game length', 'turns', TURN_LIMITS.map((t) => [t, `${t} turns`, TURN_LIMIT_LABELS[t]]), () => opts.turnLimit, (v) => (opts.turnLimit = Number(v)))),
     h('div', { class: 'seed-row' },
       h('label', { for: 'setup-seed' }, 'Map seed'), seedInput,
       h('small', { id: 'seed-help', class: 'muted' }, 'Leave blank for a random world. The same seed always makes the same map.')),
@@ -121,89 +121,182 @@ export function peaceOfferModal(app, offer) {
 
 // ---------- tech tree ----------
 
+// Card grid geometry for the tech timeline, in pixels.
+const TT = { w: 214, h: 82, colGap: 50, rowGap: 12, head: 30, pad: 10 };
+
+// Places every tech on a column/row grid. Columns follow prerequisites (a tech sits right of
+// everything it needs) and never mix eras; rows are ordered so lines cross as little as possible.
+// The result depends only on the tech data, so it is computed once.
+let techLayout = null;
+function layoutTechs() {
+  if (techLayout) return techLayout;
+  const col = {};
+  const eras = [];
+  let start = 0;
+  for (const era of ERAS) {
+    const keys = TECH_KEYS.filter((k) => TECHS[k].era === era.key);
+    for (const k of keys) col[k] = start;
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const k of keys) {
+        const c = Math.max(start, ...TECHS[k].req.map((r) => col[r] + 1));
+        if (c !== col[k]) {
+          col[k] = c;
+          changed = true;
+        }
+      }
+    }
+    const end = Math.max(...keys.map((k) => col[k]));
+    eras.push({ ...era, from: start, to: end });
+    start = end + 1;
+  }
+  const cols = [];
+  for (const k of TECH_KEYS) (cols[col[k]] ||= []).push(k);
+  const children = {};
+  for (const k of TECH_KEYS) for (const r of TECHS[k].req) (children[r] ||= []).push(k);
+
+  // Barycenter ordering: each tech wants to sit level with the techs it connects to. Rows are whole
+  // numbers within the height of the fullest column, so the tree stays compact.
+  const rows = Math.max(...cols.map((c) => c.length));
+  const row = {};
+  const place = (keys, want) => {
+    const order = keys.map((k, i) => ({ k, y: want(k) ?? i })).sort((a, b) => a.y - b.y);
+    let prev = -1;
+    for (const o of order) prev = o.at = Math.max(Math.round(o.y), prev + 1);
+    for (let i = order.length - 1, cap = rows - 1; i >= 0; i--, cap--) order[i].at = Math.min(order[i].at, cap);
+    for (const o of order) row[o.k] = o.at;
+  };
+  const mean = (list) => (list && list.length ? list.reduce((s, k) => s + row[k], 0) / list.length : null);
+  cols[0].forEach((k, i) => (row[k] = i));
+  for (let pass = 0; pass < 4; pass++) {
+    for (let c = 1; c < cols.length; c++) place(cols[c], (k) => mean(TECHS[k].req));
+    for (let c = cols.length - 2; c >= 0; c--) place(cols[c], (k) => mean((children[k] || []).filter((x) => row[x] != null)));
+  }
+  for (let c = 1; c < cols.length; c++) place(cols[c], (k) => mean(TECHS[k].req));
+  const pos = {};
+  for (const k of TECH_KEYS) pos[k] = { col: col[k], row: row[k] };
+  const last = TECH_KEYS.find((k) => TECHS[k].effect?.victory) || TECH_KEYS[TECH_KEYS.length - 1];
+  pos.future = { col: cols.length, row: pos[last].row };
+  techLayout = { pos, eras, cols: cols.length + 1, rows };
+  return techLayout;
+}
+
+const techX = (col) => TT.pad + col * (TT.w + TT.colGap);
+const techY = (row) => TT.head + TT.pad + row * (TT.h + TT.rowGap);
+
 export function openTechTree(app) {
   if (!app.state) return;
   const s = app.state;
   const p = app.human;
   const perTurn = playerYields(s, p.id).science;
   const path = p.researchPath || [];
+  const { pos, eras, cols, rows } = layoutTechs();
+  const width = techX(cols) - TT.colGap + TT.pad;
+  const height = techY(rows) - TT.rowGap + TT.pad;
   const cards = new Map();
+
+  const pick = (key) => {
+    if (app.dispatch({ type: 'research', tech: key }).ok) {
+      sfx.click();
+      openTechTree(app);
+    }
+  };
   const card = (key) => {
+    const future = key === 'future';
     const t = TECHS[key];
-    const done = p.techs.includes(key);
+    const done = !future && p.techs.includes(key);
     const current = p.research === key;
     const queued = !current && path.includes(key);
-    const available = canResearchNow(p, key);
+    const available = future ? allResearched(p) : canResearchNow(p, key);
     const state = done ? 'done' : current ? 'current' : queued ? 'queued' : available ? 'available' : 'locked';
     const turns = done ? null : turnsToResearch(p, key, perTurn);
     const progress = p.progress[key] || 0;
     let status;
-    if (done) status = 'Researched';
+    if (future) status = available ? `Repeatable · ${p.future} researched` : 'Research every tech first';
+    else if (done) status = 'Researched';
     else if (current) status = `Researching · ${turns} turn${turns === 1 ? '' : 's'}`;
     else if (queued) status = `Queued · ${turns} turns`;
     else if (available) status = `${Number.isFinite(turns) ? turns : '–'} turns`;
-    else status = `Needs ${t.req.filter((r) => !p.techs.includes(r)).map((r) => TECHS[r].name).join(' and ')}`;
+    else status = `${Number.isFinite(turns) ? turns : '–'} turns · needs ${t.req.filter((r) => !p.techs.includes(r)).map((r) => TECHS[r].name).join(', ')}`;
+    const unlocks = future ? [{ kind: 'effect', name: `+${RULES.score.future} score each` }] : unlocksOf(key);
+    const where = pos[key];
     const el = h('button', {
       type: 'button',
-      class: `tech ${state}`,
-      disabled: done,
+      class: `tech ${state}${t?.effect?.victory ? ' victory' : ''}`,
+      disabled: done || (future && !available),
       'aria-pressed': current ? 'true' : 'false',
-      onclick: () => {
-        if (app.dispatch({ type: 'research', tech: key }).ok) {
-          sfx.click();
-          openTechTree(app);
-        }
-      },
+      'data-tech': key,
+      title: `${future ? 'Future Tech' : t.name}. ${status}.${unlocks.length ? ` Unlocks: ${unlocks.map((u) => u.name).join(', ')}.` : ''}`,
+      style: { left: `${techX(where.col)}px`, top: `${techY(where.row)}px`, width: `${TT.w}px`, height: `${TT.h}px` },
+      onclick: () => pick(key),
     },
-      h('span', { class: 'tech-name' }, t.name),
+      h('span', { class: 'tech-name' }, future ? 'Future Tech' : t.name),
       h('span', { class: 'tech-status' }, status),
       current || progress ? bar(progress / techCost(key), YIELD_COLORS.science, 'Progress') : null,
-      h('span', { class: 'tech-unlocks' }, ...unlocksOf(key).map((u) => h('span', { class: `chip ${u.kind}` }, u.name))),
+      h('span', { class: 'tech-unlocks' }, ...unlocks.map((u) => h('span', { class: `chip ${u.kind}` }, u.name))),
       h('span', { class: 'tech-cost' }, `${techCost(key)}`, h('span', { html: icon('science') })));
     cards.set(key, el);
     return el;
   };
-  const tiers = [1, 2, 3].map((tier) => h('div', { class: 'tech-col' }, h('h3', {}, ['Ancient', 'Classical', 'Advanced'][tier - 1]),
-    ...TECH_KEYS.filter((k) => TECHS[k].tier === tier).map(card)));
-  const futureDone = allResearched(p);
-  const future = h('div', { class: 'tech-col' }, h('h3', {}, 'Beyond'),
-    h('button', { type: 'button', class: `tech ${p.research === 'future' ? 'current' : futureDone ? 'available' : 'locked'}`, disabled: !futureDone, onclick: () => { if (app.dispatch({ type: 'research', tech: 'future' }).ok) openTechTree(app); } },
-      h('span', { class: 'tech-name' }, 'Future Tech'),
-      h('span', { class: 'tech-status' }, futureDone ? `Repeatable · ${p.future} researched` : 'Research every tech first'),
-      h('span', { class: 'tech-unlocks' }, h('span', { class: 'chip effect' }, `+${RULES.score.future} score each`)),
-      h('span', { class: 'tech-cost' }, `${techCost('future')}`, h('span', { html: icon('science') }))));
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'tech-lines');
-  const grid = h('div', { class: 'tech-grid' }, svg, ...tiers, future);
-  const content = h('div', { class: 'stack' },
-    h('div', { class: 'row-between' }, h('h2', {}, 'Technologies'), h('span', { class: 'muted small' }, `${fmt(perTurn)} science per turn · ${p.techs.length}/${TECH_KEYS.length} researched`)),
-    h('p', { class: 'small muted' }, 'Pick any tech. If it needs earlier techs, those are researched first automatically.'),
-    h('div', { class: 'tech-scroll' }, grid));
-  app.openModal(content, { wide: true, label: 'Tech tree' });
-  requestAnimationFrame(() => drawTechLines(grid, svg, cards, p));
-}
 
-function drawTechLines(grid, svg, cards, p) {
-  const base = grid.getBoundingClientRect();
-  svg.setAttribute('width', base.width);
-  svg.setAttribute('height', base.height);
-  let paths = '';
-  for (const key of TECH_KEYS) {
-    const to = cards.get(key)?.getBoundingClientRect();
-    if (!to) continue;
-    for (const r of TECHS[key].req) {
-      const from = cards.get(r)?.getBoundingClientRect();
-      if (!from) continue;
-      const x1 = from.right - base.left;
-      const y1 = from.top + from.height / 2 - base.top;
-      const x2 = to.left - base.left;
-      const y2 = to.top + to.height / 2 - base.top;
-      const mx = (x1 + x2) / 2;
-      const done = p.techs.includes(r);
-      paths += `<path d="M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}" class="${done ? 'done' : ''}"/>`;
+  // Prerequisite lines, drawn from the layout rather than measured from the DOM.
+  let lines = '';
+  const link = (from, to, cls) => {
+    const a = pos[from];
+    const b = pos[to];
+    const x1 = techX(a.col) + TT.w;
+    const y1 = techY(a.row) + TT.h / 2;
+    const x2 = techX(b.col);
+    const y2 = techY(b.row) + TT.h / 2;
+    const mx = x2 - TT.colGap / 2;
+    lines += `<path class="${cls}" d="M${x1} ${y1}H${mx}${y1 === y2 ? '' : `C${mx + 12} ${y1} ${mx + 12} ${y2} ${mx + 24} ${y2}`}H${x2}"/>`;
+  };
+  for (const k of TECH_KEYS) for (const r of TECHS[k].req) link(r, k, p.techs.includes(k) ? 'done' : p.techs.includes(r) ? 'open' : path.includes(k) ? 'queued' : '');
+  const lastKey = TECH_KEYS.find((k) => TECHS[k].effect?.victory);
+  if (lastKey) link(lastKey, 'future', p.techs.includes(lastKey) ? 'open' : '');
+
+  const bands = eras.map((e, i) => {
+    const left = techX(e.from) - TT.colGap / 2 + (i === 0 ? TT.colGap / 2 - TT.pad : 0);
+    const right = techX(e.to) + TT.w + TT.colGap / 2;
+    const reached = i <= ERA_INDEX[eraOf(p.techs).key];
+    return h('div', { class: `era-band${i % 2 ? ' alt' : ''}${reached ? ' reached' : ''}`, 'data-era': e.key, style: { left: `${left}px`, width: `${right - left}px`, height: `${height}px` } },
+      h('span', { class: 'era-name' }, `${e.name} Era`));
+  });
+  const svg = `<svg class="tech-lines" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lines}</svg>`;
+  const canvas = h('div', { class: 'tech-canvas', style: { width: `${width}px`, height: `${height}px` } },
+    ...bands, h('div', { html: svg, style: { display: 'contents' } }), ...TECH_KEYS.map(card), card('future'));
+  const scroller = h('div', { class: 'tech-scroll' }, canvas);
+
+  const scrollToCol = (col, smooth = true) => scroller.scrollTo({ left: Math.max(0, techX(col) - scroller.clientWidth / 2 + TT.w / 2), behavior: smooth ? 'smooth' : 'auto' });
+  const eraNav = h('div', { class: 'era-nav', role: 'group', 'aria-label': 'Jump to era' }, ...eras.map((e) =>
+    h('button', { type: 'button', class: `btn small ghost${e.key === eraOf(p.techs).key ? ' active' : ''}`, onclick: () => scrollToCol((e.from + e.to) / 2) }, e.name)));
+
+  const search = h('input', { type: 'search', class: 'tech-search', placeholder: 'Search techs and unlocks', 'aria-label': 'Search techs and unlocks' });
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    let first = null;
+    for (const [key, el] of cards) {
+      const text = key === 'future' ? 'future tech' : `${TECHS[key].name} ${unlocksOf(key).map((u) => u.name).join(' ')}`.toLowerCase();
+      const hit = q.length > 1 && text.includes(q);
+      el.classList.toggle('match', hit);
+      el.classList.toggle('dim', q.length > 1 && !hit);
+      if (hit && !first) first = key;
     }
-  }
-  svg.innerHTML = paths;
+    if (first) scrollToCol(pos[first].col);
+  });
+
+  const era = eraOf(p.techs);
+  const content = h('div', { class: 'tech-tree' },
+    h('div', { class: 'tech-head' },
+      h('div', {}, h('h2', {}, 'Technologies'),
+        h('p', { class: 'small muted' }, `${era.name} Era · ${fmt(perTurn)} science per turn · ${p.techs.length}/${TECH_KEYS.length} researched. Pick any tech; the techs it needs are researched first.`)),
+      search),
+    eraNav,
+    scroller);
+  app.openModal(content, { full: true, label: 'Tech tree' });
+  // Open on what the player is working toward: the current research, else the frontier.
+  const focus = p.research && pos[p.research] ? p.research : TECH_KEYS.find((k) => canResearchNow(p, k)) || 'future';
+  requestAnimationFrame(() => scrollToCol(pos[focus].col, false));
 }
 
 // ---------- diplomacy ----------
@@ -394,7 +487,7 @@ export function openHelp(app) {
   const keys = [
     ['Click a unit', 'Select it'], ['Click a highlighted tile', 'Move there, or attack a red tile'], ['Right-click', 'Move or attack with the selected unit'],
     ['Drag / WASD / arrows', 'Pan the map'], ['Scroll / + / −', 'Zoom'], ['Enter', 'End turn, or jump to what needs orders'], ['Shift+Enter', 'End turn anyway'],
-    ['Space', 'Skip unit'], ['F', 'Fortify'], ['Z', 'Sleep'], ['B', 'Found city'], ['Tab or .', 'Next unit'], ['C', 'Center on selection'],
+    ['Space', 'Skip unit'], ['F', 'Fortify'], ['Z', 'Sleep'], ['B', 'Found city'], ['U', 'Upgrade unit'], ['Tab or .', 'Next unit'], ['C', 'Center on selection'],
     ['T', 'Tech tree'], ['P', 'Diplomacy'], ['Y', 'Tile yields'], ['Esc', 'Cancel, deselect, then menu'], ['Delete', 'Disband unit'],
   ];
   app.openModal(h('div', { class: 'stack help' },
@@ -402,11 +495,13 @@ export function openHelp(app) {
     h('div', { class: 'help-grid' },
       h('section', {},
         h('h3', {}, 'Winning'),
-        h('p', {}, `Capture every rival's original capital for a domination victory. Otherwise the highest score when the turn limit ends wins. You lose if you lose all your cities.`),
+        h('p', {}, `Capture every rival's original capital for a domination victory, or be first to research Offworld Mission, the last tech of the Future Era, for a science victory. Otherwise the highest score when the turn limit ends wins. You lose if you lose all your cities.`),
+        h('h3', {}, 'Technology'),
+        h('p', {}, `${TECH_KEYS.length} techs across ${ERAS.length} eras unlock units, buildings, districts and lasting bonuses. Pick any tech in the tree and the techs it needs are researched first. When a better unit is unlocked, the old one can no longer be built; upgrade it for gold inside your borders.`),
         h('h3', {}, 'Cities'),
         h('p', {}, `Settlers found cities at least ${RULES.cityMinDistance} tiles apart. Each citizen works one tile and eats 2 food. Culture grows your borders one tile at a time, and gold can buy tiles or finish production.`),
         h('h3', {}, 'Districts'),
-        h('p', {}, 'A district takes its own tile and a city holds one per 3 population. A Campus gets +1 science per neighboring mountain, a Commercial Hub +2 gold next to coast, and both get +1 for every 2 neighboring districts (the city center counts). Encampments speed up military units but cannot sit next to the city center.'),
+        h('p', {}, 'A district takes its own tile and a city holds one per 3 population. A Campus gets +1 science per neighboring mountain, a Commercial Hub +2 gold next to coast, an Industrial Zone +1 production per neighboring mine, and a Harbor (built on coast) +2 gold next to the city center and +1 per fishing boat. All of them, and the Theater Square, get +1 for every 2 neighboring districts (the city center counts). Encampments speed up military units but cannot sit next to the city center.'),
         h('h3', {}, 'Combat'),
         h('p', {}, 'Damage depends on the strength difference. Hills, forest and fortifying help defenders; wounded units fight weaker. Ranged units take no damage back. Melee units capture a city when its HP reaches 0. Moving from one tile next to an enemy to another costs all remaining moves.'),
         h('h3', {}, 'Diplomacy'),
@@ -430,10 +525,11 @@ export function showGameOver(app) {
   const place = ranked.findIndex((r) => r.id === hid) + 1;
   const ordinal = ['', 'first', 'second', 'third', 'fourth'][place] || `${place}th`;
   const outscored = s.victory === 'score' && !won;
-  const title = won ? 'Victory' : outscored ? 'Time is up' : 'Defeat';
+  const title = won ? 'Victory' : outscored ? 'Time is up' : s.victory === 'science' ? 'Outpaced' : 'Defeat';
   const how = {
     domination: won ? 'You hold every original capital. The world is yours.' : `${winner?.name} conquered every capital.`,
     score: won ? `Time ran out and ${s.players[hid].name} leads the world.` : `Time ran out. ${winner?.name} had the highest score and you finished ${ordinal} of ${ranked.length}.`,
+    science: won ? 'Your Offworld Mission has launched. The future belongs to you.' : `${winner?.name} launched the Offworld Mission first.`,
     defeat: 'Your last city has fallen.',
   }[s.victory];
   const allPlayers = [...s.players].sort((a, b) => (b.alive ? score(s, b.id) : -1) - (a.alive ? score(s, a.id) : -1));

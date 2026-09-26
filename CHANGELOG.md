@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 — 2026-09-26
+
+The full tech tree: 76 techs across 9 eras, from Pottery to the Offworld Mission, modeled on Civilization VI with Gathering Storm. The design reference is [docs/tech-dictionary.md](docs/tech-dictionary.md).
+
+- **Tech tree screen:** a full-screen timeline with era bands, prerequisite lines, era jump buttons and a search box that finds techs by name or by what they unlock. It opens scrolled to your current research.
+- **Tech effects:** 36 techs give lasting bonuses, such as more food from farms, extra production in every city, extra moves or sight, stronger units and cities, a map reveal, and percentage boosts to yields.
+- **Units:** 29 units in upgrade lines, from Warrior to Mechanized Infantry, Spearman to Modern Anti-Tank, Horseman to Modern Armor, and Catapult to Rocket Artillery. A new unit replaces the old one in the build list, and queued units switch over automatically. Upgrade old units for gold inside your borders (the U key). Anti-cavalry units get +10 against mounted units, and siege units +10 against cities.
+- **Buildings and districts:** 27 buildings. Castle and Star Fort build on Walls. Three new districts: the Industrial Zone (+1 production per neighboring mine), the Theater Square, and the Harbor, which is built on coast. There's also a new improvement, the Lumber Mill, for forests.
+- **City defense keeps up with the era:** a city's strength follows the best melee unit its owner can build.
+- **Science victory:** the first civilization to research Offworld Mission wins. You're warned when a rival can start it.
+- **Epic game length:** a new 250-turn option has time to reach the Future era.
+- **AI:** rivals value techs by what they unlock, head toward the science victory late in the game, build the new districts and buildings, add anti-cavalry and siege units to their armies, and upgrade their units.
+- **Maps:** new 2D symbols and 3D models for rifles, spears, cannons and tanks; a pier and crane for Harbors; smokestacks for Industrial Zones; a stage for Theater Squares; log piles for Lumber Mills; and taller walls for Castles and Star Forts.
+- **Saves:** 1.1 saves load. Philosophy no longer exists, so it is removed from them.
+- **Checks:** 39 unit tests (13 of them new, for the tech tree). The soak test reports each game's era at turn 100 and at the end. The browser check covers the tech tree, search and unit upgrades.
+
 ## 1.1.0 — 2026-09-26
 
 The map is now 3D, in the style of Civilization VI.

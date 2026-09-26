@@ -2,6 +2,7 @@
 // unit glyphs and civ emblems. Everything is drawn in code, so the game ships with no image files.
 
 import { corner } from '../core/hex.js';
+import { UNITS } from '../data/units.js';
 
 export const TERRAIN_COLORS = {
   grass: '#86B45A',
@@ -13,7 +14,7 @@ export const TERRAIN_COLORS = {
 };
 export const PARCHMENT = '#D9CDAF';
 
-export const DISTRICT_COLORS = { campus: '#3A7BD5', commercial: '#D9A62B', encampment: '#B5543F' };
+export const DISTRICT_COLORS = { campus: '#3A7BD5', commercial: '#D9A62B', encampment: '#B5543F', industrial: '#D8742A', theater: '#9B5FC4', harbor: '#2A9DB0' };
 
 export function hexPath(size) {
   const p = new Path2D();
@@ -231,6 +232,16 @@ export function drawImprovement(ctx, kind, s) {
     ctx.lineTo(s * 0.32, s * 0.02);
     ctx.lineTo(s * 0.32, s * 0.42);
     ctx.stroke();
+  } else if (kind === 'lumbermill') {
+    // A stack of logs, ends showing.
+    for (const [lx, ly] of [[-0.16, 0.36], [0.16, 0.36], [0, 0.2]]) {
+      ctx.fillStyle = '#7B5536';
+      ctx.fillRect((lx - 0.16) * s, (ly - 0.07) * s, 0.32 * s, 0.14 * s);
+      ctx.fillStyle = '#D6B27A';
+      ctx.beginPath();
+      ctx.arc((lx + 0.16) * s, ly * s, 0.07 * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
@@ -288,6 +299,44 @@ export function drawDistrictSymbol(ctx, key, x, y, r, color) {
     ctx.fill();
     ctx.fillStyle = DISTRICT_COLORS.commercial;
     ctx.fillRect(-r * 0.12, -r * 0.5, r * 0.24, r);
+  } else if (key === 'industrial') {
+    // Gear.
+    ctx.beginPath();
+    for (let k = 0; k < 16; k++) {
+      const a = (k * Math.PI) / 8;
+      const rr = k % 2 ? r * 0.68 : r * 0.95;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = DISTRICT_COLORS.industrial;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (key === 'theater') {
+    // Star.
+    ctx.beginPath();
+    for (let k = 0; k < 10; k++) {
+      const a = -Math.PI / 2 + (k * Math.PI) / 5;
+      const rr = k % 2 ? r * 0.42 : r;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+  } else if (key === 'harbor') {
+    // Anchor.
+    ctx.lineWidth = r * 0.22;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.62, r * 0.2, 0, Math.PI * 2);
+    ctx.moveTo(0, -r * 0.42);
+    ctx.lineTo(0, r * 0.85);
+    ctx.moveTo(-r * 0.4, -r * 0.15);
+    ctx.lineTo(r * 0.4, -r * 0.15);
+    ctx.moveTo(-r * 0.75, r * 0.25);
+    ctx.quadraticCurveTo(-r * 0.6, r * 0.85, 0, r * 0.85);
+    ctx.quadraticCurveTo(r * 0.6, r * 0.85, r * 0.75, r * 0.25);
+    ctx.stroke();
   } else {
     ctx.beginPath();
     ctx.moveTo(0, -r);
@@ -354,7 +403,7 @@ export function drawUnitGlyph(ctx, type, x, y, r, color) {
   ctx.lineWidth = r * 0.16;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  switch (type) {
+  switch (UNITS[type]?.glyph || type) {
     case 'settler':
       ctx.beginPath();
       ctx.moveTo(-r * 0.75, -r * 0.05);
@@ -435,6 +484,52 @@ export function drawUnitGlyph(ctx, type, x, y, r, color) {
       ctx.beginPath();
       ctx.moveTo(-r * 0.55, r * 0.05);
       ctx.lineTo(-r * 0.05, r * 0.55);
+      ctx.stroke();
+      break;
+    case 'spear':
+      ctx.lineWidth = r * 0.14;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.6, r * 0.7);
+      ctx.lineTo(r * 0.45, -r * 0.45);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(r * 0.75, -r * 0.75);
+      ctx.lineTo(r * 0.28, -r * 0.5);
+      ctx.lineTo(r * 0.5, -r * 0.28);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'gun':
+      ctx.lineWidth = r * 0.2;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.7, r * 0.45);
+      ctx.lineTo(r * 0.75, -r * 0.45);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.75, r * 0.2);
+      ctx.lineTo(-r * 0.3, r * 0.2);
+      ctx.lineTo(-r * 0.3, r * 0.7);
+      ctx.lineTo(-r * 0.75, r * 0.7);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'tank':
+      ctx.fillRect(-r * 0.75, r * 0.05, r * 1.5, r * 0.45);
+      ctx.fillRect(-r * 0.35, -r * 0.3, r * 0.65, r * 0.35);
+      ctx.lineWidth = r * 0.14;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.3, -r * 0.14);
+      ctx.lineTo(r * 0.85, -r * 0.14);
+      ctx.stroke();
+      break;
+    case 'cannon':
+      ctx.beginPath();
+      ctx.arc(-r * 0.15, r * 0.4, r * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = r * 0.28;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.55, r * 0.25);
+      ctx.lineTo(r * 0.7, -r * 0.35);
       ctx.stroke();
       break;
     case 'catapult':

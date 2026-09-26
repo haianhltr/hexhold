@@ -4,6 +4,7 @@
 import { neighbors, distance } from './hex.js';
 import { UNITS } from '../data/units.js';
 import { atWar, cityAt, unitsAt, militaryAt } from './query.js';
+import { maxMoves } from './effects.js';
 
 export const passable = (tile) => tile.t !== 'mountain' && tile.t !== 'coast' && tile.t !== 'ocean';
 export const moveCost = (tile) => Math.min(3, 1 + (tile.hills ? 1 : 0) + (tile.forest ? 1 : 0));
@@ -157,7 +158,7 @@ export function reachableTiles(state, unit) {
 
 // For each step of a path, the turn on which the unit arrives there (0 = this turn).
 export function pathTurns(state, unit, path) {
-  const max = UNITS[unit.type].moves;
+  const max = maxMoves(state, unit);
   let left = unit.moves;
   let turn = 0;
   return path.map((i) => {

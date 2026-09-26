@@ -3,6 +3,7 @@
 
 import { UNITS } from '../data/units.js';
 import { RULES } from '../data/rules.js';
+import { effects, maxMoves } from './effects.js';
 
 const EMPTY = Object.freeze([]);
 
@@ -61,14 +62,15 @@ export function spawnUnit(state, owner, type, tile) {
     owner,
     tile,
     hp: 100,
-    moves: def.moves,
+    moves: 0,
     fortified: false,
     sleeping: false,
     path: null,
     acted: false,
     bonus: 0,
   };
-  if (def.charges) unit.charges = def.charges + (hasTech(state, owner, 'construction') ? 1 : 0);
+  unit.moves = maxMoves(state, unit);
+  if (def.charges) unit.charges = def.charges + effects(state, owner).builderCharges;
   state.units[unit.id] = unit;
   touch(state);
   return unit;

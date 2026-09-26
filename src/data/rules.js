@@ -20,9 +20,6 @@ export const RULES = {
   cityStrengthBase: 15,
   cityStrengthPerPop: 2,
   cityStrikeRange: 2,
-  wallsHp: 100,
-  wallsStrength: 10,
-  constructionWallsHp: 50,
   healNeutral: 10,
   healOwn: 20,
   healCity: 25,
@@ -35,7 +32,7 @@ export const RULES = {
   sciencePerPop: 0.6,
   culturePerCity: 1,
   districtBase: 1,
-  futureTechCost: 150,
+  futureTechCost: 1000,
   yearStart: -4000,
   yearsPerTurn: 40,
   score: { city: 5, pop: 1, tech: 2, district: 3, tilesPer: 10, future: 5 },
@@ -55,4 +52,5 @@ export const MAP_SIZES = {
   medium: { label: 'Medium', w: 36, h: 22 },
 };
 
-export const TURN_LIMITS = [60, 100, 150];
+export const TURN_LIMITS = [60, 100, 150, 250];
+export const TURN_LIMIT_LABELS = { 60: 'About 20 min', 100: 'About 40 min', 150: 'About an hour', 250: 'Epic: reach the future' };

@@ -214,6 +214,20 @@ async function main() {
   await evaluate(`document.querySelector('.tb-research').click(); true`);
   await sleep(400);
   await shot('06-tech-tree');
+  const tree = await evaluate(`(() => {
+    const sc = document.querySelector('.tech-scroll');
+    const cur = document.querySelector('.tech.current').getBoundingClientRect();
+    const box = sc.getBoundingClientRect();
+    const search = document.querySelector('.tech-search');
+    search.value = 'tank'; search.dispatchEvent(new Event('input'));
+    const hits = [...document.querySelectorAll('.tech.match')].map((e) => e.dataset.tech);
+    return { cards: document.querySelectorAll('.tech-canvas .tech').length, lines: document.querySelectorAll('.tech-lines path').length,
+      currentVisible: cur.left >= box.left && cur.right <= box.right, hits };
+  })()`);
+  console.log(`  ${tree.cards} cards, ${tree.lines} lines, current research in view: ${tree.currentVisible}, search "tank" finds ${tree.hits.join(', ')}`);
+  if (tree.cards !== 77 || tree.lines < 76 || !tree.currentVisible || !tree.hits.includes('combustion')) throw new Error('Tech tree is incomplete');
+  await sleep(500);
+  await shot('06b-tech-search');
   await evaluate(`hexhold.closeModal(); true`);
 
   console.log('Play 30 turns');
@@ -237,6 +251,24 @@ async function main() {
   await shot('08-district-placement');
   await evaluate(`hexhold.mode = null; hexhold.deselect(); true`);
 
+  console.log('Unit upgrade');
+  const upgraded = await evaluate(`(() => {
+    const app = hexhold; const s = app.state; const p = s.players[app.humanId];
+    const u = Object.values(s.units).find((u) => u.owner === app.humanId && u.type === 'warrior' && s.map.tiles[u.tile].owner === app.humanId)
+      || Object.values(s.units).find((u) => u.owner === app.humanId && u.type === 'warrior');
+    if (!u) return 'no warrior';
+    const c = Object.values(s.cities).find((c) => c.owner === app.humanId);
+    if (s.map.tiles[u.tile].owner !== app.humanId) { u.tile = c.tile; }
+    for (const k of ['mining', 'bronze', 'ironworking']) if (!p.techs.includes(k)) p.techs.push(k);
+    p.gold += 200; u.moves = 2; app.selectUnit(u); app.refresh();
+    const btn = [...document.querySelectorAll('.up-actions button')].find((b) => b.textContent.startsWith('Upgrade to'));
+    if (!btn) return 'no upgrade button';
+    btn.click();
+    return s.units[u.id].type;
+  })()`);
+  console.log(`  warrior became: ${upgraded}`);
+  if (upgraded !== 'swordsman') throw new Error('Upgrading a unit failed');
+
   console.log('Diplomacy and help');
   await evaluate(`document.querySelector('.tb-actions button:nth-child(2)').click(); true`);
   await sleep(300);
@@ -248,6 +280,10 @@ async function main() {
   console.log(`  reached turn ${tEnd}, phase ${await evaluate('hexhold.state.phase')}`);
   await sleep(1400);
   await shot('10-late-game');
+  await evaluate(`(async () => { const m = await import(new URL('src/ui/screens.js', document.baseURI).href); m.openTechTree(hexhold); return true; })()`);
+  await sleep(500);
+  await shot('10b-tech-tree-late');
+  await evaluate(`hexhold.closeModal(); true`);
 
   console.log('Map rendering speed (Medium map, 4 civs, late game)');
   await load(`${base}?new&seed=7&size=medium&rivals=3`);
@@ -273,6 +309,32 @@ async function main() {
   })()`);
   console.log(`  ending a turn with 3 AI rivals took ${turnCost} ms (target under 1500)`);
   await shot('13-medium-late');
+
+  console.log('Later-era units and districts');
+  const staged = await evaluate(`(async () => {
+    const q = await import(new URL('src/core/query.js', document.baseURI).href);
+    const hex = await import(new URL('src/core/hex.js', document.baseURI).href);
+    const app = hexhold; const s = app.state; const hid = app.humanId;
+    const mine = Object.values(s.cities).filter((c) => c.owner === hid);
+    const c = mine.find((c) => hex.within(s.map, c.tile, 2).some((i) => s.map.tiles[i].t === 'coast' && s.map.tiles[i].city === c.id)) || mine[0];
+    const land = (i) => !['coast', 'ocean', 'mountain'].includes(s.map.tiles[i].t);
+    const free = hex.within(s.map, c.tile, 2).filter((i) => i !== c.tile && land(i) && !s.map.tiles[i].district && !q.unitsAt(s, i).length && !q.cityAt(s, i));
+    const types = ['tank', 'modernarmor', 'rocketartillery', 'fieldcannon', 'artillery', 'musketman', 'pikeman', 'mechinfantry', 'knight', 'trebuchet'];
+    types.forEach((t, k) => { if (free[k] != null) q.spawnUnit(s, hid, t, free[k]); });
+    const spare = free.slice(types.length);
+    const coast = hex.within(s.map, c.tile, 2).find((i) => s.map.tiles[i].t === 'coast' && s.map.tiles[i].city === c.id && !s.map.tiles[i].district);
+    if (coast != null) { s.map.tiles[coast].district = 'harbor'; c.districts.push(coast); }
+    for (const d of ['industrial', 'theater']) { const i = spare.shift(); if (i != null) { s.map.tiles[i].district = d; c.districts.push(i); } }
+    const forest = spare.find((i) => s.map.tiles[i].forest);
+    if (forest != null) s.map.tiles[forest].imp = 'lumbermill';
+    for (const b of ['walls', 'castle']) if (!c.buildings.includes(b)) c.buildings.push(b);
+    q.touch(s); app.deselect(); app.refresh();
+    const r = app.renderer; r.cam.zoom = 1.6; r.centerOn(c.tile, false);
+    return { units: types.filter((t, k) => free[k] != null).length, harbor: coast != null };
+  })()`);
+  console.log(`  placed ${staged.units} later-era units; harbor: ${staged.harbor}`);
+  await sleep(800);
+  await shot('14-later-eras');
 
   console.log('Save and reload');
   const saved = await evaluate(`(async () => { const s = await import(new URL('src/save/storage.js', document.baseURI).href); return s.autosave(hexhold.state); })()`);

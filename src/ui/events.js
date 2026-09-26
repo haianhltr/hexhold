@@ -4,9 +4,9 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { IMPROVEMENTS } from '../data/terrain.js';
-import { TECHS } from '../data/techs.js';
+import { TECHS, TECH_KEYS } from '../data/techs.js';
 import { itemName } from '../core/city.js';
-import { techName } from '../core/research.js';
+import { techName, canResearchNow } from '../core/research.js';
 import { haveMet } from '../core/query.js';
 
 export function unlocksOf(tech) {
@@ -25,7 +25,14 @@ export function describeEvent(s, e, hid) {
   const cityTile = (id) => s.cities[id]?.tile;
   switch (e.type) {
     case 'tech': {
-      if (e.player !== hid) return null;
+      if (e.player !== hid) {
+        // Warn when a rival is one tech away from a science victory.
+        const goal = TECH_KEYS.find((k) => TECHS[k].effect?.victory);
+        if (goal && TECHS[goal].req.includes(e.tech) && canResearchNow(s.players[e.player], goal)) {
+          return { kind: 'bad', icon: 'science', text: `${haveMet(s, hid, e.player) ? P(e.player) : 'A rival'} can now research ${TECHS[goal].name}. If they finish it, they win.`, open: 'tech' };
+        }
+        return null;
+      }
       const unlocked = unlocksOf(e.tech).map((u) => u.name);
       return { kind: 'good', icon: 'science', text: `Researched ${techName(e.tech)}.${unlocked.length ? ` Unlocks ${unlocked.join(', ')}.` : ''}`, open: 'tech' };
     }

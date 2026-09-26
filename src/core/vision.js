@@ -3,9 +3,10 @@
 import { within, neighbors } from './hex.js';
 import { UNITS } from '../data/units.js';
 import { pairKey, unitsAt } from './query.js';
+import { effects } from './effects.js';
 
 export function sightOf(state, unit) {
-  return UNITS[unit.type].sight + (state.map.tiles[unit.tile].hills ? 1 : 0);
+  return UNITS[unit.type].sight + (state.map.tiles[unit.tile].hills ? 1 : 0) + effects(state, unit.owner).sight;
 }
 
 function computeVisible(state, pid) {

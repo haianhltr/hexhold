@@ -1,6 +1,8 @@
-// Score, elimination and the three ways a game ends: domination, score at the turn limit, defeat.
+// Score, elimination and the ways a game ends: domination, science (Offworld Mission), score at
+// the turn limit, and defeat.
 
 import { RULES } from '../data/rules.js';
+import { TECHS } from '../data/techs.js';
 import { citiesOf, removeUnit } from './query.js';
 
 export function scoreBreakdown(state, pid) {
@@ -68,6 +70,12 @@ export function checkVictory(state, events) {
   const alive = state.players.filter((p) => p.alive);
   if (alive.length === 1) {
     endGame(state, 'domination', alive[0].id, events);
+    return;
+  }
+  // Science victory: the first civilization to research a victory tech (Offworld Mission).
+  const launcher = alive.find((p) => p.techs.some((k) => TECHS[k]?.effect?.victory === 'science'));
+  if (launcher) {
+    endGame(state, 'science', launcher.id, events);
     return;
   }
   const everyoneFounded = alive.every((p) => p.origCapital != null);

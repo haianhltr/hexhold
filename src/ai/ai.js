@@ -2,15 +2,17 @@
 // and moves every unit. It only ever changes the game through applyAction, so it plays by the same
 // rules as the human, and it only reacts to what it can see.
 
-import { UNITS, isMilitary } from '../data/units.js';
+import { UNITS, isMilitary, hasTag } from '../data/units.js';
 import { TECHS, TECH_KEYS } from '../data/techs.js';
+import { BUILDINGS } from '../data/buildings.js';
+import { DISTRICTS } from '../data/districts.js';
 import { DIFFICULTY, RULES } from '../data/rules.js';
-import { improvementValid } from '../data/terrain.js';
+import { improvementValid, IMPROVEMENTS } from '../data/terrain.js';
 import { applyAction } from '../core/actions.js';
 import { citiesOf, unitsOf, atWar, haveMet, cityAt, hasTech, militaryAt } from '../core/query.js';
 import { distance, neighbors, within } from '../core/hex.js';
 import { findPath, canEnter, passable } from '../core/pathfind.js';
-import { foundReason, buildOptions, bestDistrictTile, workableTiles, buyCost } from '../core/city.js';
+import { foundReason, buildOptions, bestDistrictTile, workableTiles, buyCost, cityHasStrike, upgradeTarget, upgradeCost, cityMaxHp } from '../core/city.js';
 import { attackInfo, inRange, lineOfSight, cityStrikeInfo } from '../core/combat.js';
 import { militaryPower, aiWantsPeace } from '../core/diplomacy.js';
 import { canResearchNow, allResearched } from '../core/research.js';
@@ -18,10 +20,43 @@ import { startScore } from '../core/mapgen.js';
 import { visibleTiles } from '../core/vision.js';
 import { playerYields } from '../core/yields.js';
 
-const RESEARCH_WEIGHTS = {
-  builder: { pottery: 9, writing: 9, animal: 6, mining: 6, currency: 8, masonry: 4, archery: 5, bronze: 5, philosophy: 8, horseback: 3, mathematics: 4, construction: 4 },
-  conqueror: { archery: 9, mining: 8, bronze: 9, animal: 6, horseback: 8, masonry: 6, pottery: 5, writing: 5, mathematics: 7, construction: 5, currency: 4, philosophy: 3 },
-};
+// How much a building is worth to this AI, per point of production it costs.
+function buildingValue(def, conqueror, broke) {
+  let v = (def.food || 0) * 1.3 + (def.prod || 0) * 1.6 + (def.gold || 0) * (broke ? 2.2 : 1) + (def.science || 0) * (conqueror ? 1.2 : 1.7) + (def.culture || 0) * 0.7;
+  if (def.unitBonus) v += conqueror ? 3 : 1;
+  return v;
+}
+
+// How much a tech is worth to this AI, from what it unlocks. Data-driven, so new techs just work.
+function techValue(ctx, key) {
+  const conq = ctx.p.personality === 'conqueror';
+  const war = atWarAny(ctx);
+  let v = 1;
+  for (const d of Object.values(UNITS)) {
+    if (d.tech !== key) continue;
+    if (d.cls === 'civilian') v += 2;
+    else v += (conq ? 3.5 : 1.8) + (war ? 2.5 : 0);
+  }
+  for (const d of Object.values(BUILDINGS)) if (d.tech === key) v += buildingValue(d, conq, false) * 0.8 + (d.defense ? (war ? 3 : 1) : 0);
+  for (const [k, d] of Object.entries(DISTRICTS)) if (d.tech === key) v += k === 'encampment' ? (conq ? 4 : 1.5) : 3.5;
+  for (const d of Object.values(IMPROVEMENTS)) if (d.tech === key) v += 2.5;
+  const e = TECHS[key].effect;
+  if (e) {
+    const n = Math.max(1, citiesOf(ctx.state, ctx.pid).length);
+    for (const k in e.yieldPct || {}) v += e.yieldPct[k] / 4;
+    for (const k in e.cityYield || {}) v += e.cityYield[k] * n * 0.6;
+    for (const f of ['resourceBonus', 'improvementBonus', 'terrainBonus', 'districtBonus', 'buildingBonus']) if (e[f]) v += 2.5;
+    if (e.moves) v += 3;
+    if (e.sight) v += 1;
+    if (e.heal) v += 1.5;
+    if (e.strength) v += conq ? 4 : 2;
+    if (e.cityStrength || e.wallsHp) v += war ? 3 : 1;
+    if (e.revealMap) v += 2;
+    if (e.builderCharges) v += 1.5;
+    if (e.victory) v += 80;
+  }
+  return v;
+}
 
 export function runAI(state, pid, events) {
   const p = state.players[pid];
@@ -55,7 +90,7 @@ export function runAI(state, pid, events) {
 function cityStrikes(ctx) {
   const { state, pid } = ctx;
   for (const c of citiesOf(state, pid)) {
-    if (!c.buildings.includes('walls') || c.struck) continue;
+    if (!cityHasStrike(c) || c.struck) continue;
     let best = -1;
     let bestScore = -Infinity;
     for (const t of within(state.map, c.tile, RULES.cityStrikeRange)) {
@@ -149,12 +184,15 @@ function chooseResearch(ctx) {
     ctx.act({ type: 'research', tech: 'future' });
     return;
   }
-  const w = RESEARCH_WEIGHTS[p.personality || 'builder'];
+  // Score each available tech by its own value plus half the value of what it opens up, per unit of
+  // cost, so the AI favors cheap, useful techs and follows paths toward strong ones.
   let best = null;
   let bestScore = -Infinity;
   for (const k of TECH_KEYS) {
     if (!canResearchNow(p, k)) continue;
-    const s = w[k] - TECHS[k].tier * 1.5;
+    let v = techValue(ctx, k);
+    for (const c of TECH_KEYS) if (TECHS[c].req.includes(k)) v += techValue(ctx, c) * 0.5;
+    const s = v / Math.pow(TECHS[k].cost, 0.7);
     if (s > bestScore) {
       bestScore = s;
       best = k;
@@ -195,10 +233,12 @@ function bestMilitary(ctx, opts) {
   const pool = units.filter((o) => (UNITS[o.key].cls === 'ranged') === wantRanged);
   const list = pool.length ? pool : units;
   list.sort((a, b) => Math.max(UNITS[b.key].strength, UNITS[b.key].ranged || 0) - Math.max(UNITS[a.key].strength, UNITS[a.key].ranged || 0));
-  const hasCatapult = army.some((u) => u.type === 'catapult');
-  if (wantRanged && atWarAny(ctx) && !hasCatapult && list.some((o) => o.key === 'catapult')) {
-    return { kind: 'unit', key: 'catapult' };
-  }
+  const hasSiege = army.some((u) => hasTag(u.type, 'siege'));
+  const siege = list.find((o) => hasTag(o.key, 'siege'));
+  if (wantRanged && atWarAny(ctx) && !hasSiege && siege) return { kind: 'unit', key: siege.key };
+  // Mix in anti-cavalry when rivals field mounted units.
+  const spear = units.find((o) => hasTag(o.key, 'antiCav'));
+  if (spear && !wantRanged && army.filter((u) => hasTag(u.type, 'antiCav')).length * 4 < army.length) return { kind: 'unit', key: spear.key };
   return { kind: 'unit', key: list[0].key };
 }
 
@@ -206,6 +246,7 @@ function improvementFor(state, pid, i) {
   const t = state.map.tiles[i];
   if (t.owner !== pid || t.district || t.imp || cityAt(state, i)) return null;
   if (hasTech(state, pid, 'mining') && improvementValid(t, 'mine')) return 'mine';
+  if (hasTech(state, pid, 'machinery') && improvementValid(t, 'lumbermill')) return 'lumbermill';
   if (improvementValid(t, 'farm')) return 'farm';
   return null;
 }
@@ -231,17 +272,39 @@ function chooseProduction(ctx, city, counts) {
     return { kind: 'unit', key: 'builder' };
   }
   if (!broke && counts.military < wantMilitary) return bestMilitary(ctx, opts);
-  const districtOrder = p.personality === 'conqueror' ? ['encampment', 'campus', 'commercial'] : ['campus', 'commercial', 'encampment'];
-  if (broke && has('district', 'commercial')) districtOrder.unshift('commercial');
+  if ((war || threatened) && city.hp < cityMaxHp(state, city) * 0.9) {
+    const wall = opts.find((o) => o.kind === 'building' && BUILDINGS[o.key].defense);
+    if (wall) return { kind: 'building', key: wall.key };
+  }
+
+  // Districts first (they unlock the best buildings), ordered by personality and need.
+  const conq = p.personality === 'conqueror';
+  const districtOrder = conq
+    ? ['encampment', 'industrial', 'campus', 'commercial', 'harbor', 'theater']
+    : ['campus', 'commercial', 'industrial', 'harbor', 'theater', 'encampment'];
+  if (broke) districtOrder.unshift('commercial', 'harbor');
   for (const key of districtOrder) {
     if (!has('district', key)) continue;
     const tile = bestDistrictTile(state, city, key);
     if (tile >= 0) return { kind: 'district', key, tile };
   }
-  const buildingOrder = broke ? ['market', 'monument', 'library', 'granary', 'barracks'] : ['library', 'market', 'monument', 'granary', 'barracks'];
-  if (war || threatened) buildingOrder.unshift('walls');
-  for (const key of buildingOrder) if (has('building', key)) return { kind: 'building', key };
-  if (has('building', 'walls') && nCities > 1) return { kind: 'building', key: 'walls' };
+
+  // Then the building with the best yield per production cost.
+  let best = null;
+  let bestScore = 0;
+  for (const o of opts) {
+    if (o.kind !== 'building') continue;
+    const def = BUILDINGS[o.key];
+    let v = buildingValue(def, conq, broke);
+    if (def.defense) v = war || threatened ? 6 : nCities > 2 ? 1.2 : 0;
+    if (o.key === 'monument' && nCities <= 3) v += 2;
+    const s = v / def.cost;
+    if (s > bestScore) {
+      bestScore = s;
+      best = o.key;
+    }
+  }
+  if (best) return { kind: 'building', key: best };
   if (!broke) return bestMilitary(ctx, opts);
   return has('unit', 'builder') ? { kind: 'unit', key: 'builder' } : null;
 }
@@ -282,6 +345,16 @@ function spendGold(ctx) {
     const cost = buyCost(c, item);
     const urgent = item.kind === 'unit' && isMilitary(item.key) && threatsNear(ctx, c.tile, 4) > 0;
     if ((urgent && p.gold >= cost) || p.gold >= cost + 150) ctx.act({ type: 'buy', city: c.id });
+  }
+  // Upgrade outdated units standing at home, strongest gains first, keeping a reserve.
+  const reserve = atWarAny(ctx) ? 20 : 60;
+  const candidates = unitsOf(state, pid)
+    .map((u) => ({ u, to: upgradeTarget(state, u) }))
+    .filter((x) => x.to && x.u.moves > 0 && state.map.tiles[x.u.tile].owner === pid)
+    .sort((a, b) => UNITS[b.to].strength - UNITS[b.u.type].strength - (UNITS[a.to].strength - UNITS[a.u.type].strength));
+  for (const { u, to } of candidates) {
+    if (p.gold - upgradeCost(u.type, to) < reserve) break;
+    ctx.act({ type: 'upgrade', unit: u.id });
   }
 }
 
