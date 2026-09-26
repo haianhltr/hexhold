@@ -1,0 +1,12 @@
+{
+  "name": "hexhold",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn-based 4X strategy game in plain HTML and JavaScript.",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "test": "node --test",
+    "soak": "node tools/soak.mjs"
+  }
+}

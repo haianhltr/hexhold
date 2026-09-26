@@ -1,0 +1,4 @@
+node_modules/
+tools/shots/
+*.zip
+.DS_Store
