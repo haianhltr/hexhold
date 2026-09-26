@@ -21,7 +21,7 @@
 | Could: E9.7 touch | Partly done. Tap to select, drag to pan and pinch to zoom work; there are no hover tooltips on touch. |
 | Could: E3.5 scout auto-explore, E5.6 pillage, E6.4 boosts, E8.6 AI worker, E11.3 music | Not built. E8.6 turned out to be unnecessary: AI turns take milliseconds. |
 | E12.3 browser support | Verified in Chromium (Edge) only. Firefox and Safari are still to be tested by hand. |
-| E12.5 deploy | Ready to publish. GitHub Pages and itch.io need your accounts; the steps are in the README. |
+| E12.5 deploy | GitHub Pages: done, live at https://haianhltr.github.io/hexhold/ and verified with the browser check. itch.io: not uploaded yet (needs your itch.io account; the steps are in the README). |
 
 Changes from the plan:
 

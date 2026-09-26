@@ -2,6 +2,7 @@
 // protocol, plays through scripted turns, saves screenshots to tools/shots/ and fails on any
 // console error or uncaught exception.
 //   node tools/ui-check.mjs            (set BROWSER=path/to/chrome.exe to choose the browser)
+//   SITE=https://you.github.io/hexhold/ node tools/ui-check.mjs    (check a deployed copy)
 
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
@@ -29,7 +30,8 @@ if (!browserPath) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const server = spawn(process.execPath, [join(root, 'dev-server.mjs')], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
+const SITE = process.env.SITE; // test a deployed copy instead of a local server, e.g. SITE=https://you.github.io/hexhold/
+const server = SITE ? null : spawn(process.execPath, [join(root, 'dev-server.mjs')], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
 const profile = join(tmpdir(), `hexhold-ui-${Date.now()}`);
 const browser = spawn(browserPath, [
   '--headless=new', `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`,
@@ -106,7 +108,7 @@ async function load(url) {
 
 // Ends turns (letting the AI play for the human) until `turns` have passed.
 const PLAY = (turns) => `(async () => {
-  const { runAI } = await import('/src/ai/ai.js');
+  const { runAI } = await import(new URL('src/ai/ai.js', document.baseURI).href);
   const app = window.hexhold;
   for (let i = 0; i < ${turns} && app.state.phase === 'playing'; i++) {
     const me = app.state.players[app.humanId];
@@ -130,7 +132,7 @@ async function main() {
     if (m.method === 'Runtime.consoleAPICalled' && (m.params.type === 'error' || m.params.type === 'warning')) problems.push(`console.${m.params.type}: ${m.params.args.map((a) => a.value ?? a.description).join(' ')}`);
     if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error' && !/favicon/.test(m.params.entry.url || '')) problems.push(`log: ${m.params.entry.text} ${m.params.entry.url || ''}`);
   });
-  const base = `http://localhost:${PORT}/`;
+  const base = SITE ? SITE.replace(/\/?$/, '/') : `http://localhost:${PORT}/`;
 
   console.log('Title screen');
   await load(base);
@@ -255,7 +257,7 @@ async function main() {
   await shot('13-medium-late');
 
   console.log('Save and reload');
-  const saved = await evaluate(`(async () => { const s = await import('/src/save/storage.js'); return s.autosave(hexhold.state); })()`);
+  const saved = await evaluate(`(async () => { const s = await import(new URL('src/save/storage.js', document.baseURI).href); return s.autosave(hexhold.state); })()`);
   await load(base);
   const cont = await evaluate(`!![...document.querySelectorAll('.title-actions button')].find(b => b.textContent === 'Continue')`);
   console.log(`  autosave ok: ${saved}, continue offered: ${cont}`);
@@ -282,7 +284,7 @@ try {
     /* already closed */
   }
   browser.kill();
-  server.kill();
+  server?.kill();
   await sleep(300);
   await rm(profile, { recursive: true, force: true }).catch(() => {});
 }

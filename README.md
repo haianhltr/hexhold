@@ -2,6 +2,8 @@
 
 A turn-based 4X strategy game in the spirit of Civilization VI, built with plain HTML and JavaScript. It runs in any modern browser, with no install, no server and no build step. (Hexhold is a working title.)
 
+**Play it: https://haianhltr.github.io/hexhold/**
+
 Found cities, place districts for adjacency bonuses, research a 12-tech tree, fight rival civilizations, and win by conquest or by score when time runs out. A game takes 20–60 minutes.
 
 ## Play locally
@@ -22,13 +24,13 @@ Handy URL options: `?new` starts a game straight away (add `&seed=42&size=medium
 | `node tools/soak.mjs` | 20 full AI-vs-AI games of 150 turns, checking rule invariants every round | about 7 s |
 | `node tools/ui-check.mjs` | Drives a headless Chromium browser through a whole game with real clicks and keys. Fails on any console error, reports frame and turn timings, and saves screenshots to `tools/shots/`. | about 1 min |
 
-`ui-check` looks for Edge or Chrome in the usual places. Set `BROWSER=/path/to/chrome` to pick one.
+`ui-check` looks for Edge or Chrome in the usual places. Set `BROWSER=/path/to/chrome` to pick one, or `SITE=https://haianhltr.github.io/hexhold/` to check the published copy instead of a local server.
 
 ## Publish it
 
 The game is static files: `index.html`, `styles.css` and `src/`.
 
-- **GitHub Pages:** push the repository and enable Pages on the main branch (root folder). The `.nojekyll` file keeps Pages from filtering any files.
+- **GitHub Pages** (live at https://haianhltr.github.io/hexhold/): every push to `main` republishes the site in about a minute. The `.nojekyll` file keeps Pages from filtering any files.
 - **itch.io:** zip `index.html`, `styles.css` and `src/` so that `index.html` is at the top of the zip, then upload it as an HTML5 game. On Windows: `Compress-Archive -Path index.html,styles.css,src,.nojekyll -DestinationPath hexhold.zip`.
 
 ## How the code is organized
