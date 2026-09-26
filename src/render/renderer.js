@@ -13,9 +13,13 @@ const HEX = hexPath(SIZE);
 const HEX_INNER = hexPath(SIZE * 0.9);
 
 export class Renderer {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+  constructor(stage) {
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'map-canvas';
+    this.canvas.setAttribute('aria-label', 'Game map');
+    stage.append(this.canvas);
+    this.ctx = this.canvas.getContext('2d');
+    this.alive = true;
     this.state = null;
     this.viewer = 0;
     this.cam = { x: 0, y: 0, zoom: 1 };
@@ -31,7 +35,18 @@ export class Renderer {
     this.dpr = 1;
     this.resize();
     this.loop = this.loop.bind(this);
-    requestAnimationFrame(this.loop);
+    this.raf = requestAnimationFrame(this.loop);
+  }
+
+  destroy() {
+    this.alive = false;
+    cancelAnimationFrame(this.raf);
+    this.canvas.remove();
+  }
+
+  // Ground points at the screen corners (a rectangle for this top-down view), for the minimap.
+  viewPolygon() {
+    return [[0, 0], [this.w, 0], [this.w, this.h], [0, this.h]].map(([x, y]) => this.screenToWorld(x, y));
   }
 
   setState(state, viewer) {
@@ -43,8 +58,8 @@ export class Renderer {
 
   resize() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = this.canvas.clientWidth || window.innerWidth;
-    const h = this.canvas.clientHeight || window.innerHeight;
+    const w = this.canvas.parentElement?.clientWidth || window.innerWidth;
+    const h = this.canvas.parentElement?.clientHeight || window.innerHeight;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
     this.w = w;
@@ -191,6 +206,7 @@ export class Renderer {
   // ---------- frame ----------
 
   loop(now) {
+    if (!this.alive) return;
     if (this.camTarget) {
       const dx = this.camTarget.x - this.cam.x;
       const dy = this.camTarget.y - this.cam.y;
@@ -210,7 +226,7 @@ export class Renderer {
       this.draw(now);
       if (this.onDraw) this.onDraw();
     }
-    requestAnimationFrame(this.loop);
+    this.raf = requestAnimationFrame(this.loop);
   }
 
   visibleRange() {

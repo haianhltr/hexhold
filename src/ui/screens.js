@@ -16,7 +16,7 @@ import { h, clear, fill, icon, emblemSvg, bar, fmt, YIELD_COLORS } from './dom.j
 import { unlocksOf } from './events.js';
 import { setVolume, sfx, unlockAudio } from './sound.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 
 // ---------- title & setup ----------
 
@@ -368,8 +368,17 @@ export function openSettings(app) {
     h('input', { type: 'checkbox', id, checked: !!st[key], onchange: (e) => { st[key] = e.target.checked; save(); if (after) after(); } }), label);
   const speed = h('select', { id: 'set-speed', onchange: (e) => { st.animSpeed = Number(e.target.value); save(); } },
     ...[[0.6, 'Relaxed'], [1, 'Normal'], [2, 'Fast'], [5, 'Very fast']].map(([v, l]) => h('option', { value: v, selected: st.animSpeed === v }, l)));
+  const view = h('select', { id: 'set-view', onchange: (e) => { st.view = e.target.value; save(); app.useRenderer(st.view); openSettings(app); } },
+    h('option', { value: '3d', selected: st.view !== '2d' }, '3D'),
+    h('option', { value: '2d', selected: st.view === '2d' }, 'Classic 2D'));
+  const shadows = h('label', { class: 'check', for: 'set-shadows' },
+    h('input', { type: 'checkbox', id: 'set-shadows', checked: !!st.shadows, disabled: st.view === '2d', onchange: (e) => { st.shadows = e.target.checked; save(); app.useRenderer(st.view); } }),
+    'Shadows (3D map; turn off on slow computers)');
   app.openModal(h('div', { class: 'stack' },
     h('h2', {}, 'Settings'),
+    h('div', { class: 'field' }, h('label', { for: 'set-view' }, 'Map view'), view,
+      app.webglMissing ? h('small', { class: 'warn-text' }, "This browser can't show 3D graphics, so the classic 2D map is used.") : null),
+    shadows,
     h('div', { class: 'field' }, h('label', { for: 'set-volume' }, 'Sound volume'), volume),
     check('set-mute', 'Mute all sound', 'muted'),
     h('div', { class: 'field' }, h('label', { for: 'set-speed' }, 'Animation speed'), speed),
@@ -406,7 +415,7 @@ export function openHelp(app) {
         h('h3', {}, 'Controls'),
         h('table', { class: 'keys' }, h('tbody', {}, ...keys.map(([k, v]) => h('tr', {}, h('th', {}, k), h('td', {}, v))))),
         h('h3', {}, 'About'),
-        h('p', { class: 'small' }, `Hexhold ${VERSION}. An original game inspired by the 4X genre; not affiliated with any other game or publisher. All art is drawn in code. Fonts: Marcellus, Instrument Sans and JetBrains Mono, under the SIL Open Font License.`)))), { wide: true, label: 'How to play' });
+        h('p', { class: 'small' }, `Hexhold ${VERSION}. An original game inspired by the 4X genre; not affiliated with any other game or publisher. All art is drawn in code. 3D graphics use Three.js (MIT License). Fonts: Marcellus, Instrument Sans and JetBrains Mono, under the SIL Open Font License.`)))), { wide: true, label: 'How to play' });
 }
 
 // ---------- game over ----------

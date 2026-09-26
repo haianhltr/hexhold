@@ -95,7 +95,7 @@ export function deleteSave(key) {
 
 export const hasContinue = () => !!read('auto.0');
 
-export const DEFAULT_SETTINGS = { volume: 0.6, muted: false, animSpeed: 1, hints: true, hintsSeen: {}, autoNext: true, showYields: false };
+export const DEFAULT_SETTINGS = { volume: 0.6, muted: false, animSpeed: 1, hints: true, hintsSeen: {}, autoNext: true, showYields: false, view: '3d', shadows: true };
 
 export function loadSettings() {
   try {

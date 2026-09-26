@@ -100,12 +100,15 @@ export class Minimap {
     ctx.drawImage(this.base, 0, 0);
     const r = this.app.renderer;
     const b = r.mapBounds();
-    const [x0, y0] = r.screenToWorld(0, 0);
-    const [x1, y1] = r.screenToWorld(r.w, r.h);
     const sx = (this.w * this.dpr) / b.w;
     const sy = (this.h * this.dpr) / b.h;
+    const poly = r.viewPolygon();
+    if (!poly.every(Boolean)) return;
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 1.5 * this.dpr;
-    ctx.strokeRect((x0 + SIZE) * sx, (y0 + SIZE) * sy, (x1 - x0) * sx, (y1 - y0) * sy);
+    ctx.beginPath();
+    poly.forEach(([x, y], k) => (k ? ctx.lineTo((x + SIZE) * sx, (y + SIZE) * sy) : ctx.moveTo((x + SIZE) * sx, (y + SIZE) * sy)));
+    ctx.closePath();
+    ctx.stroke();
   }
 }

@@ -18,6 +18,7 @@ import { allResearched } from '../core/research.js';
 import { visibleTiles } from '../core/vision.js';
 import { RULES } from '../data/rules.js';
 import { Renderer } from '../render/renderer.js';
+import { Renderer3D, webglAvailable } from '../render/renderer3d.js';
 import { Minimap } from '../render/minimap.js';
 import { h, clear, fill } from './dom.js';
 import { sfx, setVolume, unlockAudio } from './sound.js';
@@ -27,7 +28,7 @@ import { renderTopBar, renderUnitPanel, renderCityPanel, renderEndTurn, renderNo
 import { showTitle, openTechTree, openMenu, showGameOver, confirmModal, openHelp, peaceOfferModal, openDiplomacy } from './screens.js';
 import { describeEvent, eventSound } from './events.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 export class App {
   constructor(root) {
@@ -44,12 +45,8 @@ export class App {
     this.keysDown = new Set();
     this.debug = new URLSearchParams(location.search).has('debug');
     this.buildDom();
-    this.renderer = new Renderer(this.canvas);
-    this.renderer.animSpeed = this.settings.animSpeed;
-    this.renderer.showYields = this.settings.showYields;
-    this.renderer.tileYieldFn = (i) => (this.state ? tileYield(this.state, i, this.humanId) : null);
     this.minimap = new Minimap(this.minimapCanvas, this);
-    this.renderer.onDraw = () => this.minimap.draw();
+    this.useRenderer(this.settings.view);
     this.bindInput();
     window.addEventListener('resize', () => {
       this.renderer.resize();
@@ -58,13 +55,48 @@ export class App {
     requestAnimationFrame((t) => this.tick(t));
   }
 
-  buildDom() {
-    this.canvas = document.getElementById('map');
-    if (!this.canvas) {
-      this.canvas = h('canvas', { id: 'map' });
-      this.root.append(this.canvas);
+  // Picks the 3D map (default) or the classic 2D map. Falls back to 2D when WebGL is missing.
+  useRenderer(kind) {
+    const prev = this.renderer;
+    let next = null;
+    this.webglMissing = false;
+    if (kind !== '2d') {
+      if (webglAvailable()) {
+        try {
+          next = new Renderer3D(this.stage, { shadows: this.settings.shadows });
+        } catch {
+          next = null;
+        }
+      }
+      this.webglMissing = !next;
     }
-    this.canvas.setAttribute('aria-label', 'Game map');
+    if (!next) next = new Renderer(this.stage);
+    next.animSpeed = this.settings.animSpeed;
+    next.showYields = this.settings.showYields;
+    next.tileYieldFn = (i) => (this.state ? tileYield(this.state, i, this.humanId) : null);
+    next.onDraw = () => this.minimap.draw();
+    this.renderer = next;
+    const cam = prev ? { ...prev.cam } : null;
+    const reveal = prev ? prev.revealAll : false;
+    if (prev) prev.destroy();
+    const world = this.state || (this.drift ? this.backdrop : null);
+    if (world) {
+      next.revealAll = this.state ? reveal : true;
+      next.setState(world, this.state ? this.humanId : 0);
+      if (cam) next.cam = cam;
+      next.clampCamera();
+      if (this.state) this.refresh();
+    }
+    this.minimap.dirty = true;
+  }
+
+  buildDom() {
+    this.stage = document.getElementById('stage');
+    if (!this.stage) {
+      this.stage = h('div', { id: 'stage' });
+      this.root.before(this.stage);
+    }
+    document.getElementById('map')?.remove();
     this.topbar = h('header', { class: 'topbar' });
     this.notesEl = h('aside', { class: 'notes', 'aria-live': 'polite', 'aria-label': 'Notifications' });
     this.unitPanel = h('section', { class: 'unit-panel panel', hidden: true, 'aria-label': 'Selected unit' });
@@ -744,7 +776,7 @@ export class App {
   // ---------- input ----------
 
   bindInput() {
-    const c = this.canvas;
+    const c = this.stage;
     let down = null;
     let pinch = null;
     const pointers = new Map();

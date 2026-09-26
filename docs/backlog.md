@@ -2,6 +2,12 @@
 
 **Hexhold** is a working title. Rename it any time.
 
+## Update (v1.1.0, 2026-09-26)
+
+The map is now 3D (WebGL through Three.js), styled after Civilization VI. The classic 2D map remains under Settings → Map view and switches on automatically without WebGL. The details are in CHANGELOG.md. The browser check covers both maps.
+
+On a desktop GPU (RTX 5080, headless Edge), the 3D map runs at the browser's frame cap of 240 fps and uses under 1 ms of CPU per frame. Ending a turn with 3 AI rivals takes about 60 ms.
+
 ## Status (v1.0.0, 2026-09-26)
 
 **All 50 Must stories are built and verified.** The checks behind that:

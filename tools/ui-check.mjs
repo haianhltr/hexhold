@@ -3,6 +3,7 @@
 // console error or uncaught exception.
 //   node tools/ui-check.mjs            (set BROWSER=path/to/chrome.exe to choose the browser)
 //   SITE=https://you.github.io/hexhold/ node tools/ui-check.mjs    (check a deployed copy)
+//   SOFTWARE_GL=1 node tools/ui-check.mjs                          (no GPU: render WebGL in software)
 
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
@@ -35,7 +36,7 @@ const server = SITE ? null : spawn(process.execPath, [join(root, 'dev-server.mjs
 const profile = join(tmpdir(), `hexhold-ui-${Date.now()}`);
 const browser = spawn(browserPath, [
   '--headless=new', `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--window-size=1440,900', '--hide-scrollbars', 'about:blank',
+  '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--window-size=1440,900', '--hide-scrollbars', '--ignore-gpu-blocklist', ...(process.env.SOFTWARE_GL ? ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] : []), 'about:blank',
 ], { stdio: 'ignore' });
 
 let ws;
@@ -194,6 +195,21 @@ async function main() {
   await sleep(300);
   await shot('05-unit-selected');
 
+  console.log('Close-up and switching map views');
+  await evaluate(`(() => { const r = hexhold.renderer; const c = Object.values(hexhold.state.cities)[0]; r.cam.zoom = 1.9; r.centerOn(c.tile, false); hexhold.deselect(); return true; })()`);
+  await sleep(500);
+  await shot('05b-closeup');
+  const before = await evaluate('hexhold.renderer.constructor.name');
+  await evaluate(`hexhold.useRenderer('2d'); true`);
+  await sleep(400);
+  const mid = await evaluate('hexhold.renderer.constructor.name');
+  await shot('05c-classic-2d');
+  await evaluate(`hexhold.useRenderer('3d'); hexhold.renderer.cam.zoom = 1.05; true`);
+  await sleep(300);
+  const after = await evaluate('hexhold.renderer.constructor.name');
+  console.log(`  ${before} → ${mid} → ${after}`);
+  if (mid !== 'Renderer' || after !== before) throw new Error('Switching map views failed');
+
   console.log('Tech tree');
   await evaluate(`document.querySelector('.tb-research').click(); true`);
   await sleep(400);
@@ -247,7 +263,9 @@ async function main() {
     r.cam.zoom = 1.05; r.dirty = true;
     return out;
   })()`);
-  console.log(`  average frame: ${perf['1.05']} ms at normal zoom, ${perf['0.45']} ms zoomed all the way out (16.7 ms = 60 fps)`);
+  const fps = await evaluate(`new Promise((done) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 2000) requestAnimationFrame(f); else done(Math.round(n / ((performance.now() - t0) / 1000))); }; requestAnimationFrame(f); })`);
+  const kind = await evaluate('hexhold.renderer.constructor.name');
+  console.log(`  ${kind}: ${perf['1.05']} ms of CPU per frame at normal zoom, ${perf['0.45']} ms zoomed out; ${fps} frames per second`);
   const turnCost = await evaluate(`(async () => {
     const t0 = performance.now(); hexhold.endTurn();
     while (hexhold.busy) await new Promise(r => setTimeout(r, 5));

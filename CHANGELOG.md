@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 — 2026-09-26
+
+The map is now 3D, in the style of Civilization VI.
+
+- **3D renderer (WebGL through Three.js):** a tilted perspective camera that lowers as you zoom in; terrain with height and hills; blended ground colors under a painted grain; shallow and deep water with animated waves and surf; mountains, forests and farms; cities and districts as clusters of 3D buildings, with walls when built; units as small 3D figures under Civ-style flags; soft sunlight and shadows.
+- **Fog of war:** unexplored land sits under parchment, and explored areas out of sight turn sepia.
+- **Classic 2D:** the original 2D map remains available under Settings → Map view. It's also used automatically when a browser can't show 3D.
+- **Settings:** a Map view option (3D or Classic 2D) and a Shadows switch for slower computers.
+- Three.js r170 (MIT License) is included in `vendor/three/`, so the game still needs no install, no build step and no network for code.
+- The browser check now covers the 3D map, switching views, and frame rate.
+
 ## 1.0.0 — 2026-09-26
 
 First release.
