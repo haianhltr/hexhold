@@ -1,5 +1,5 @@
 // Buildings (see docs/tech-dictionary.md). Those with `district` need that district in the city;
-// `requires` names a building that must already stand. `defense` adds city HP and strength, and
+// `requires` names a building that must already stand. A `tech` or `civic` field names what unlocks it. `defense` adds city HP and strength, and
 // `strike` lets the city attack nearby enemies.
 
 const b = (name, cost, info, extra = {}) => ({ name, cost, info, ...extra });
@@ -38,8 +38,8 @@ export const BUILDINGS = {
   powerplant: b('Power Plant', 230, '+5 Production', { prod: 5, district: 'industrial', tech: 'electricity' }),
 
   // Theater Square
-  amphitheater: b('Amphitheater', 80, '+2 Culture', { culture: 2, district: 'theater', tech: 'construction' }),
-  artmuseum: b('Art Museum', 140, '+3 Culture', { culture: 3, district: 'theater', tech: 'printing' }),
+  amphitheater: b('Amphitheater', 80, '+2 Culture', { culture: 2, district: 'theater', civic: 'drama' }),
+  artmuseum: b('Art Museum', 140, '+3 Culture', { culture: 3, district: 'theater', civic: 'humanism' }),
   broadcast: b('Broadcast Center', 220, '+4 Culture', { culture: 4, district: 'theater', tech: 'radio' }),
 
   // Harbor

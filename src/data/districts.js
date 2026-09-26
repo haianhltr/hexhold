@@ -1,5 +1,6 @@
 // Districts occupy a tile inside the city's borders. A city may hold 1 district per 3 population.
-// Adjacency rules live in core/placement.js; `water` districts go on coast tiles.
+// Adjacency rules live in core/placement.js; `water` districts go on coast tiles. Each is unlocked by
+// a `tech` or, for the Theater Square, a `civic`.
 
 export const DISTRICTS = {
   campus: {
@@ -34,7 +35,7 @@ export const DISTRICTS = {
   theater: {
     name: 'Theater Square',
     cost: 45,
-    tech: 'construction',
+    civic: 'drama',
     yield: 'culture',
     info: '+1 Culture, +1 per 2 adjacent districts',
   },

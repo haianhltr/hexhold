@@ -32,10 +32,14 @@ export const RULES = {
   sciencePerPop: 0.6,
   culturePerCity: 1,
   districtBase: 1,
-  futureTechCost: 1000,
+  futureTechCost: 1600,
+  futureCivicCost: 800,
+  policySwapBase: 20, // gold per newly slotted policy card outside a free-change turn...
+  policySwapPerCivic: 3, // ...plus this much per civic researched
+  governmentCostMult: 3, // switching government outside a free-change turn costs this many card swaps
   yearStart: -4000,
   yearsPerTurn: 40,
-  score: { city: 5, pop: 1, tech: 2, district: 3, tilesPer: 10, future: 5 },
+  score: { city: 5, pop: 1, tech: 2, civic: 2, district: 3, tilesPer: 10, future: 5 },
   maxQueue: 5,
   idleProductionCap: 60,
   settlerMinPop: 2,

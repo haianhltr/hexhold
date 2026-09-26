@@ -5,6 +5,8 @@
 import { UNITS } from '../data/units.js';
 import { IMPROVEMENTS, improvementValid } from '../data/terrain.js';
 import { TECHS } from '../data/techs.js';
+import { CIVICS } from '../data/civics.js';
+import { GOVERNMENTS } from '../data/government.js';
 import { RULES } from '../data/rules.js';
 import { distance, within } from './hex.js';
 import { touch, removeUnit, owningCity, hasTech, atWar, haveMet, cityAt } from './query.js';
@@ -18,6 +20,8 @@ import {
 } from './city.js';
 import { validDistrictTiles } from './placement.js';
 import { setResearch, techName } from './research.js';
+import { setCivic, civicName, governmentUnlocked, governmentChangeCost, refitPolicies, policiesReason, policyChangeCost } from './civics.js';
+import { effects } from './effects.js';
 import { declareWar, makePeace, aiWantsPeace } from './diplomacy.js';
 import { refreshVision } from './vision.js';
 import { checkVictory, checkElimination } from './victory.js';
@@ -189,7 +193,7 @@ const HANDLERS = {
     if (!target) return `Needs ${TECHS[UNITS[next].tech].name}`;
     if (state.map.tiles[u.tile].owner !== u.owner) return 'Units can only upgrade inside your borders';
     if (u.moves <= 0) return 'This unit has no moves left this turn';
-    const cost = upgradeCost(u.type, target);
+    const cost = upgradeCost(u.type, target, effects(state, u.owner).upgradeDiscount);
     const p = state.players[a.player];
     if (p.gold < cost) return `Needs ${cost} gold`;
     p.gold -= cost;
@@ -250,7 +254,7 @@ const HANDLERS = {
     if (!c) return 'That city is not yours';
     const item = c.queue[0];
     if (!item) return 'Choose something to build first';
-    const cost = buyCost(c, item);
+    const cost = buyCost(state, c, item);
     const p = state.players[a.player];
     if (p.gold < cost) return `Needs ${cost} gold`;
     if (!completeItem(state, c, item, ev)) {
@@ -293,6 +297,40 @@ const HANDLERS = {
     const p = state.players[a.player];
     if (a.tech !== 'future' && !TECHS[a.tech]) return 'Unknown tech';
     if (!setResearch(p, a.tech)) return a.tech === 'future' ? 'Research every other tech first' : `${techName(a.tech)} is already researched`;
+    return null;
+  },
+
+  civic(state, a) {
+    const p = state.players[a.player];
+    if (a.civic !== 'futurecivic' && !CIVICS[a.civic]) return 'Unknown civic';
+    if (!setCivic(p, a.civic)) return a.civic === 'futurecivic' ? 'Research every other civic first' : `${civicName(a.civic)} is already researched`;
+    return null;
+  },
+
+  government(state, a, ev) {
+    const p = state.players[a.player];
+    const def = GOVERNMENTS[a.government];
+    if (!def) return 'Unknown government';
+    if (p.government === a.government) return `You already have ${def.name}`;
+    if (!governmentUnlocked(p, a.government)) return `${def.name} needs ${CIVICS[def.civic].name}`;
+    const cost = governmentChangeCost(p);
+    if (p.gold < cost) return `Changing government needs ${cost} gold`;
+    p.gold -= cost;
+    p.policies = refitPolicies(p, a.government);
+    p.government = a.government;
+    p.freeChanges = true; // a new government's slots can be filled for free this turn
+    ev.push({ type: 'government', player: a.player, government: a.government });
+    return null;
+  },
+
+  policies(state, a) {
+    const p = state.players[a.player];
+    const why = policiesReason(p, a.policies);
+    if (why) return why;
+    const cost = policyChangeCost(p, a.policies);
+    if (p.gold < cost) return `These changes need ${cost} gold`;
+    p.gold -= cost;
+    p.policies = [...a.policies];
     return null;
   },
 

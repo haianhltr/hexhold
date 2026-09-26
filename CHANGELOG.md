@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.0 — 2026-09-26
+
+The civics tree, governments and policy cards, modeled on Civilization VI with Gathering Storm. The design reference is [docs/civics-dictionary.md](docs/civics-dictionary.md).
+
+- **Civics:** 59 civics in 9 eras, researched with culture, plus a repeatable Future Civic. The civics tree uses the same timeline screen as the tech tree (V key, or the civic bar in the top bar), and the two trees link to each other.
+- **Governments:** 13 governments in five tiers, from Chiefdom to Synthetic Technocracy. Each has a bonus and a set of military, economic and wildcard policy slots.
+- **Policy cards:** 57 cards, such as Urban Planning, Agoge, Natural Philosophy, Conscription, Professional Army and Grande Armée. Later cards replace earlier ones and take their slot automatically.
+- **Government screen (G):** slot cards, see what changes cost, confirm or undo, and switch government. Changes are free on any turn you finish a civic; at other times each new card costs gold.
+- **New effects:** production toward kinds of units and buildings, doubled district adjacency, stronger district buildings, per-district and capital yields, fewer upkeep costs, cheaper upgrades, tiles and purchases, and faster growth.
+- **The Theater Square** and Amphitheater now come from the Drama and Poetry civic, and the Art Museum from Humanism, as in Civ VI.
+- **AI:** rivals pick civics, choose governments and fill their policy slots based on what each card is worth to them right now.
+- **Top bar:** tech and civic progress side by side, and a Government button that pulses when you have an empty slot you could fill. The End Turn button asks for a civic and a first government.
+- **Balance:** tech costs from the Renaissance on are higher, because policies add a lot of science. On Normal, AI-vs-AI Epic games end in a science victory between turns 185 and 245, or reach the turn limit.
+- **Score:** each civic is worth 2 points, like a tech.
+- **Saves:** 1.2 saves load and start the civics tree from the beginning.
+- **Checks:** 51 unit tests (12 of them new, for civics). The soak test checks government and policy rules every round and reports civics eras. The browser check covers the civics tree and slotting a card on the government screen.
+
 ## 1.2.0 — 2026-09-26
 
 The full tech tree: 76 techs across 9 eras, from Pottery to the Offworld Mission, modeled on Civilization VI with Gathering Storm. The design reference is [docs/tech-dictionary.md](docs/tech-dictionary.md).

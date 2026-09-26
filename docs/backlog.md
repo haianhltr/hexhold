@@ -2,6 +2,12 @@
 
 **Hexhold** is a working title. Rename it any time.
 
+## Update (v1.3.0, 2026-09-26)
+
+Civics, governments and policy cards, modeled on Civilization VI with Gathering Storm. The reference is [civics-dictionary.md](civics-dictionary.md). It has 59 civics researched with culture, 13 governments and 57 policy cards, plus a government screen and AI that uses all of them. The details are in CHANGELOG.md.
+
+Policies add a lot of science, so tech costs from the Renaissance on went up. On Normal, the leading AI is in the Renaissance for techs and the Medieval era for civics at turn 100. In Epic games it wins by science between turns 185 and 245, or reaches the turn limit.
+
 ## Update (v1.2.0, 2026-09-26)
 
 The tech tree now has 76 techs in 9 eras, modeled on Civilization VI with Gathering Storm. The reference is [tech-dictionary.md](tech-dictionary.md). It adds unit upgrade lines, tech effects, three new districts, a science victory and a 250-turn Epic length. The details are in CHANGELOG.md.

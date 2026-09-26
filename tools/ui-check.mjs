@@ -236,6 +236,54 @@ async function main() {
   await sleep(600);
   await shot('07-turn-30');
 
+  console.log('Civics tree and government');
+  const civics = await evaluate(`(() => {
+    document.querySelector('.tb-civic').click();
+    const p = hexhold.human;
+    const cur = document.querySelector('.tech.civic.current');
+    const box = document.querySelector('.tech-scroll').getBoundingClientRect();
+    const r = cur && cur.getBoundingClientRect();
+    return { cards: document.querySelectorAll('.tech-canvas .tech.civic').length, lines: document.querySelectorAll('.tech-lines path').length,
+      done: p.civics.length, government: p.government, currentVisible: !cur || (r.left >= box.left && r.right <= box.right) };
+  })()`);
+  console.log(`  ${civics.cards} civic cards, ${civics.lines} lines, ${civics.done} civics done, government: ${civics.government}, current civic in view: ${civics.currentVisible}`);
+  if (civics.cards !== 60 || civics.lines < 59 || !civics.currentVisible || !civics.government) throw new Error('Civics tree or AI-run government is incomplete');
+  await sleep(500);
+  await shot('07b-civics-tree');
+  const gov = await evaluate(`(async () => {
+    const p = hexhold.human; p.gold += 500;
+    [...document.querySelectorAll('.tech-tools button')].find((b) => b.textContent === 'Government').click();
+    await new Promise((r) => setTimeout(r, 50));
+    const slots = document.querySelectorAll('.slots .slot').length;
+    // Empty the first slot with its × button, then fill it by clicking a card that fits.
+    const before = [...p.policies];
+    // Find a slot with another card that fits it, empty that slot with its × button, then click the card.
+    const wait = () => new Promise((r) => setTimeout(r, 30));
+    const kinds = ['military', 'economic', 'wildcard'];
+    const slotEls = [...document.querySelectorAll('.slots .slot')];
+    let target = -1, name = null;
+    for (let i = 0; i < slotEls.length && target < 0; i++) {
+      const kind = kinds.find((k) => slotEls[i].classList.contains(k));
+      const current = slotEls[i].querySelector('.policy b')?.textContent;
+      const alt = [...document.querySelectorAll('.policy-pick:not(.in):not(.nofit)')].find((el) => el.querySelector('b').textContent !== current && (kind === 'wildcard' || el.querySelector('.policy').classList.contains(kind)));
+      if (alt) { target = i; name = alt.querySelector('b').textContent; }
+    }
+    if (target < 0) return { slots, error: 'no card to slot' };
+    const x = document.querySelectorAll('.slots .slot')[target].querySelector('.policy-remove');
+    if (x) { x.click(); await wait(); }
+    const pick = [...document.querySelectorAll('.policy-pick')].find((el) => el.querySelector('b').textContent === name);
+    pick.click(); await new Promise((r) => setTimeout(r, 30));
+    const confirm = [...document.querySelectorAll('.government .btn.primary')][0];
+    const label = confirm.textContent;
+    confirm.click(); await new Promise((r) => setTimeout(r, 30));
+    return { slots, name, label, changed: p.policies.join() !== before.join(), policies: p.policies.length };
+  })()`);
+  console.log(`  ${gov.slots} policy slots; slotted ${gov.name} with "${gov.label}"; policies changed: ${gov.changed}`);
+  if (gov.error || !gov.changed || gov.slots !== gov.policies) throw new Error(`Government screen failed: ${gov.error || 'no change'}`);
+  await sleep(300);
+  await shot('07c-government');
+  await evaluate(`hexhold.closeModal(); true`);
+
   console.log('District placement');
   const placed = await evaluate(`(() => {
     const app = hexhold; const s = app.state;
@@ -270,7 +318,7 @@ async function main() {
   if (upgraded !== 'swordsman') throw new Error('Upgrading a unit failed');
 
   console.log('Diplomacy and help');
-  await evaluate(`document.querySelector('.tb-actions button:nth-child(2)').click(); true`);
+  await evaluate(`[...document.querySelectorAll('.tb-actions button')].find((b) => b.textContent === 'Diplomacy').click(); true`);
   await sleep(300);
   await shot('09-diplomacy');
   await evaluate(`hexhold.closeModal(); true`);

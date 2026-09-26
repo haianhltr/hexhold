@@ -13,6 +13,14 @@ export const HINTS = {
     title: 'Pick a technology',
     text: 'Click the research bar at the top, or press T, to open the tech tree. Writing unlocks the Campus district.',
   },
+  civic: {
+    title: 'Pick a civic',
+    text: 'Culture researches civics, the second tree. Click the civic bar at the top, or press V. Code of Laws unlocks your first government.',
+  },
+  government: {
+    title: 'Choose a government',
+    text: 'Press G to open Government. Adopt Chiefdom, then slot policy cards for bonuses. Changes are free on any turn you finish a civic.',
+  },
   move: {
     title: 'Move and explore',
     text: 'Select a unit, then click a highlighted tile to move there, or any tile to plan a longer trip. Drag to pan and scroll to zoom.',

@@ -1,11 +1,13 @@
 // The turn cycle. Each round: every player takes their turn (startPlayerTurn, then they act),
-// then endRound processes all cities, research, gold and healing, and the turn number advances.
+// then endRound processes all cities, research, civics, gold and healing, and the turn number
+// advances.
 
 import { RULES } from '../data/rules.js';
 import { UNITS } from '../data/units.js';
 import { citiesOf, unitsOf, cityAt, removeUnit } from './query.js';
 import { processCity } from './city.js';
 import { addScience } from './research.js';
+import { addCulture } from './civics.js';
 import { unitUpkeep } from './yields.js';
 import { followPath } from './movement.js';
 import { refreshVision } from './vision.js';
@@ -38,10 +40,12 @@ export function endRound(state, events) {
   for (const p of state.players) {
     if (!p.alive) continue;
     let science = 0;
+    let culture = 0;
     let gold = 0;
     for (const city of citiesOf(state, p.id)) {
       const y = processCity(state, city, events);
       science += y.science;
+      culture += y.culture;
       gold += y.gold;
     }
     p.gold += gold - unitUpkeep(state, p.id);
@@ -50,6 +54,9 @@ export function endRound(state, events) {
       p.gold = 0;
     }
     addScience(state, p.id, science, events);
+    // The free-change turn from a civic lasts one round; a civic finished now opens the next one.
+    p.freeChanges = false;
+    addCulture(state, p.id, culture, events);
   }
 
   for (const id in state.units) {

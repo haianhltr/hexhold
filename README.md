@@ -6,7 +6,7 @@ The map is 3D, drawn with WebGL through [Three.js](https://threejs.org) (MIT Lic
 
 **Play it: https://haianhltr.github.io/hexhold/**
 
-Found cities, place districts for adjacency bonuses, research a 76-tech tree from Pottery to the Offworld Mission, fight rival civilizations, and win by conquest, by science, or by score when time runs out. A game takes 20 minutes to a few hours; the 250-turn Epic length reaches the Future era.
+Found cities, place districts for adjacency bonuses, research a 76-tech tree from Pottery to the Offworld Mission and a 59-civic tree of governments and policy cards, fight rival civilizations, and win by conquest, by science, or by score when time runs out. A game takes 20 minutes to a few hours; the 250-turn Epic length reaches the Future era.
 
 ## Play locally
 
@@ -46,9 +46,9 @@ src/ui/       panels, screens, input, sound and tips
 src/save/     autosave, save slots, export and import
 tools/        soak test and browser check
 vendor/three/ Three.js r170 and its license
-docs/         backlog (epics and stories) and the tech dictionary
+docs/         backlog (epics and stories), the tech dictionary and the civics dictionary
 ```
 
 Every change to the game goes through `applyAction(state, action)` in `src/core/actions.js`. The game state is one plain object that survives `JSON.stringify`, which is all a save file is. To rebalance, edit `src/data/`.
 
-The plan and status of every story are in [docs/backlog.md](docs/backlog.md). Every tech, unit line, building and district, with costs and pacing targets, is listed in [docs/tech-dictionary.md](docs/tech-dictionary.md). What changed per version is in [CHANGELOG.md](CHANGELOG.md).
+The plan and status of every story are in [docs/backlog.md](docs/backlog.md). Every tech, unit line, building and district, with costs and pacing targets, is listed in [docs/tech-dictionary.md](docs/tech-dictionary.md). Every civic, government and policy card is in [docs/civics-dictionary.md](docs/civics-dictionary.md). What changed per version is in [CHANGELOG.md](CHANGELOG.md).

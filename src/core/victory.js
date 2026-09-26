@@ -21,7 +21,8 @@ export function scoreBreakdown(state, pid) {
     { label: 'Cities', count: cities.length, points: cities.length * S.city },
     { label: 'Population', count: pop, points: pop * S.pop },
     { label: 'Techs', count: p.techs.length, points: p.techs.length * S.tech },
-    { label: 'Future techs', count: p.future, points: p.future * S.future },
+    { label: 'Civics', count: (p.civics || []).length, points: (p.civics || []).length * S.civic },
+    { label: 'Future techs and civics', count: p.future + (p.futureCivics || 0), points: (p.future + (p.futureCivics || 0)) * S.future },
     { label: 'Districts', count: districts, points: districts * S.district },
     { label: 'Territory', count: tiles, points: Math.floor(tiles / S.tilesPer) },
   ];

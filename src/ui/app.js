@@ -15,6 +15,7 @@ import { tileYield } from '../core/yields.js';
 import { validDistrictTiles, adjacencyBonus } from '../core/placement.js';
 import { borderCandidates, buyTileCost, workableTiles, upgradeTarget } from '../core/city.js';
 import { allResearched } from '../core/research.js';
+import { availableGovernments } from '../core/civics.js';
 import { visibleTiles } from '../core/vision.js';
 import { RULES } from '../data/rules.js';
 import { Renderer } from '../render/renderer.js';
@@ -25,10 +26,10 @@ import { sfx, setVolume, unlockAudio } from './sound.js';
 import { HINTS } from './hints.js';
 import * as storage from '../save/storage.js';
 import { renderTopBar, renderUnitPanel, renderCityPanel, renderEndTurn, renderNotes, tileTooltip, combatTooltip, placementTooltip } from './panels.js';
-import { showTitle, openTechTree, openMenu, showGameOver, confirmModal, openHelp, peaceOfferModal, openDiplomacy } from './screens.js';
+import { showTitle, openTechTree, openCivicsTree, openGovernment, openMenu, showGameOver, confirmModal, openHelp, peaceOfferModal, openDiplomacy } from './screens.js';
 import { describeEvent, eventSound } from './events.js';
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 
 export class App {
   constructor(root) {
@@ -205,7 +206,7 @@ export class App {
       return r;
     }
     this.handleEvents(r.events);
-    const solves = { setProduction: 'production', enqueue: 'production', research: 'research', move: 'move', attack: 'move' }[action.type];
+    const solves = { setProduction: 'production', enqueue: 'production', research: 'research', civic: 'civic', government: 'government', move: 'move', attack: 'move' }[action.type];
     if (solves) this.resolveHint(solves);
     if (this.selection?.kind === 'unit' && !this.state.units[this.selection.id]) this.selection = null;
     if (this.selection?.kind === 'city' && this.state.cities[this.selection.id]?.owner !== this.humanId) this.selection = null;
@@ -227,6 +228,7 @@ export class App {
       if (e.type === 'gameOver') over = true;
       if (e.type === 'tech' && e.player === hid && ['writing', 'currency', 'bronze'].includes(e.tech)) this.showHint('district');
       if (e.type === 'war' && (e.a === hid || e.b === hid)) this.showHint('war');
+      if (e.type === 'civic' && e.player === hid && e.civic === 'code') this.showHint('government');
       if (e.type === 'cityFounded' && e.owner === hid) {
         this.resolveHint('welcome');
         this.showHint('production');
@@ -294,7 +296,10 @@ export class App {
     const city = citiesOf(s, this.humanId).find((c) => !c.queue.length);
     if (city) return { kind: 'city', city };
     const p = this.human;
-    if (!p.research && !allResearched(p) && citiesOf(s, this.humanId).length) return { kind: 'research' };
+    const hasCities = citiesOf(s, this.humanId).length > 0;
+    if (!p.research && !allResearched(p) && hasCities) return { kind: 'research' };
+    if (!p.civic && hasCities) return { kind: 'civic' };
+    if (!p.government && availableGovernments(p).length) return { kind: 'government' };
     return null;
   }
 
@@ -325,6 +330,8 @@ export class App {
     }
     if (b.kind === 'unit') this.selectUnit(b.unit, { center: true });
     else if (b.kind === 'city') this.selectCity(b.city, { center: true });
+    else if (b.kind === 'civic') openCivicsTree(this);
+    else if (b.kind === 'government') openGovernment(this);
     else openTechTree(this);
   }
 
@@ -358,6 +365,7 @@ export class App {
         this.selectNextPending({ center: true });
         this.checkOffers();
         if (!this.human.research && citiesOf(this.state, this.humanId).length) this.showHint('research');
+        else if (!this.human.civic && citiesOf(this.state, this.humanId).length) this.showHint('civic');
       }
       this.refresh();
     }, 40);
@@ -889,6 +897,12 @@ export class App {
         break;
       case 't':
         openTechTree(this);
+        break;
+      case 'v':
+        openCivicsTree(this);
+        break;
+      case 'g':
+        openGovernment(this);
         break;
       case 'y':
         this.settings.showYields = !this.settings.showYields;

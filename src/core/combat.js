@@ -21,10 +21,10 @@ function techMods(state, unit, role, mods) {
   const fx = effects(state, unit.owner).strength;
   const cls = UNITS[unit.type].cls;
   if (cls === 'civilian') return;
-  if (fx.all) mods.push(['Technology', fx.all]);
-  if (role !== 'ranged' && fx.melee && cls === 'melee') mods.push(['Combined arms', fx.melee]);
-  if (role === 'defense' && fx.defense) mods.push(['Stealth', fx.defense]);
-  if (role === 'ranged' && fx.ranged) mods.push(['Lasers', fx.ranged]);
+  if (fx.all) mods.push(['Empire bonuses', fx.all]);
+  if (role !== 'ranged' && fx.melee && cls === 'melee') mods.push(['Melee bonuses', fx.melee]);
+  if (role === 'defense' && fx.defense) mods.push(['Defense bonuses', fx.defense]);
+  if (role === 'ranged' && fx.ranged) mods.push(['Ranged bonuses', fx.ranged]);
 }
 
 function antiCav(unit, vs, mods) {
@@ -80,7 +80,7 @@ export function cityDefense(state, city) {
   } else mods.push(['Population', RULES.cityStrengthPerPop * city.pop]);
   for (const b of city.buildings) if (BUILDINGS[b].defense?.str) mods.push([BUILDINGS[b].name, BUILDINGS[b].defense.str]);
   const fx = effects(state, city.owner);
-  if (fx.cityStrength) mods.push(['Urban defenses', fx.cityStrength]);
+  if (fx.cityStrength) mods.push(['Defense bonuses', fx.cityStrength]);
   const garrison = militaryAt(state, city.tile);
   if (garrison && garrison.owner === city.owner) mods.push(['Garrison', Math.round(UNITS[garrison.type].strength / 4)]);
   return { base, mods, total: total(base, mods) };

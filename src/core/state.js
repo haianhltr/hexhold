@@ -6,8 +6,10 @@
 //   phase: 'playing' | 'ended' | 'extended'; victory: null | 'domination' | 'score' | 'defeat'; winner
 //   map: { w, h, tiles: [{ t, hills, forest, res, imp, owner, city, district }] }
 //   players: [{ id, civ, name, color, emblem, human, alive, gold, research, researchPath, techs,
-//               progress, sciOverflow, future, capital, origCapital, nameIdx, personality,
-//               explored: 0/1 per tile, stats, warSince, peaceSince, ai }]
+//               progress, sciOverflow, future, civic, civicPath, civics, civicProgress,
+//               cultureOverflow, futureCivics, government, policies (one per slot), freeChanges,
+//               capital, origCapital, nameIdx, personality, explored: 0/1 per tile, stats,
+//               warSince, peaceSince, ai }]
 //   units: { id: { id, type, owner, tile, hp, moves, fortified, sleeping, path, acted, bonus, charges } }
 //   cities: { id: { id, name, owner, tile, pop, food, prodStock, queue, buildings, districts, worked,
 //                   locked, culture, claimed, hp, capital, origCap, founder, founded, struck, lastAttacked } }
@@ -23,7 +25,10 @@ import { canEnter } from './pathfind.js';
 import { startPlayerTurn } from './turn.js';
 import { refreshVision } from './vision.js';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
+
+// Fields every player starts with for civics and government.
+export const civicFields = () => ({ civic: null, civicPath: [], civics: [], civicProgress: {}, cultureOverflow: 0, futureCivics: 0, government: null, policies: [], freeChanges: false });
 
 function freeNeighbor(state, owner, type, tile) {
   const probe = { owner, type, id: -1 };
@@ -89,6 +94,7 @@ export function createGame(opts = {}) {
       progress: {},
       sciOverflow: 0,
       future: 0,
+      ...civicFields(),
       capital: null,
       origCapital: null,
       nameIdx: 0,
@@ -140,6 +146,12 @@ const MIGRATIONS = {
       if (p.techs.includes('bronze') && Object.values(s.units).some((u) => u.owner === p.id && u.type === 'swordsman')) p.techs.push('ironworking');
     }
     s.version = 2;
+    return s;
+  },
+  // 1.2 → 1.3: civics and government. Everyone starts the tree from the beginning.
+  2(s) {
+    for (const p of s.players) Object.assign(p, { ...civicFields(), ...p });
+    s.version = 3;
     return s;
   },
 };

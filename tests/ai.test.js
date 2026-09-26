@@ -14,12 +14,15 @@ test('the same seed replays the same AI game exactly', () => {
   assert.equal(run(), run());
 });
 
-test('AI players expand, research and stay within save limits', () => {
+test('AI players expand, research, run a government and stay within save limits', () => {
   const s = createGame({ seed: 99, size: 'medium', rivals: 3, allAI: true, turnLimit: 150 });
   for (let i = 0; i < 60; i++) playAIRound(s, runAI);
   for (const p of s.players.filter((p) => p.alive)) {
     assert.ok(citiesOf(s, p.id).length >= 2, `${p.name} should have settled more than one city by turn 60`);
     assert.ok(p.techs.length >= 4, `${p.name} should have researched several techs`);
+    assert.ok(p.civics.length >= 4, `${p.name} should have researched several civics`);
+    assert.ok(p.government, `${p.name} should have a government`);
+    assert.ok(p.policies.filter(Boolean).length >= 2, `${p.name} should have slotted policy cards`);
   }
   for (let i = 0; i < 90 && s.phase === 'playing'; i++) playAIRound(s, runAI);
   const size = serialize(s).length;

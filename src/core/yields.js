@@ -1,4 +1,5 @@
-// What tiles, cities and players produce each turn. Tech bonuses come from core/effects.js.
+// What tiles, cities and players produce each turn. Tech, civic, government and policy bonuses come
+// from core/effects.js.
 
 import { TERRAIN, HILLS, FOREST, RESOURCES, IMPROVEMENTS } from '../data/terrain.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -23,7 +24,7 @@ export function tileYield(state, i, pid = state.map.tiles[i].owner) {
   const fx = pid >= 0 ? effects(state, pid) : null;
   if (tile.district) {
     const d = DISTRICTS[tile.district];
-    if (d.yield) y[d.yield] = RULES.districtBase + adjacencyBonus(state, i, tile.district);
+    if (d.yield) y[d.yield] = RULES.districtBase + adjacencyBonus(state, i, tile.district) * (1 + (fx?.adjacencyPct[tile.district] || 0) / 100);
     if (fx) addInto(y, fx.districtBonus[tile.district]);
     return y;
   }
@@ -52,12 +53,17 @@ export function cityYields(state, city) {
   for (const t of city.districts) addInto(y, tileYield(state, t, city.owner));
   y.science += RULES.sciencePerPop * city.pop;
   y.culture += RULES.culturePerCity;
-  if (city.capital) addInto(y, RULES.palace);
+  if (city.capital) {
+    addInto(y, RULES.palace);
+    addInto(y, fx.capitalYield);
+  }
   for (const b of city.buildings) {
-    addInto(y, BUILDINGS[b]);
+    const def = BUILDINGS[b];
+    addInto(y, def, 1 + (def.district ? fx.buildingPct[def.district] || 0 : 0) / 100);
     addInto(y, fx.buildingBonus[b]);
   }
   addInto(y, fx.cityYield);
+  addInto(y, fx.perDistrict, city.districts.length);
   for (const k of YIELD_KEYS) if (fx.yieldPct[k]) y[k] *= 1 + fx.yieldPct[k] / 100;
   if (!p.human) {
     const m = DIFFICULTY[state.difficulty].aiYield;
@@ -77,7 +83,7 @@ export function unitUpkeep(state, pid) {
     const u = state.units[id];
     if (u.owner === pid && UNITS[u.type].cls !== 'civilian') military++;
   }
-  return Math.max(0, military - citiesOf(state, pid).length * RULES.freeUnitsPerCity);
+  return Math.max(0, military - citiesOf(state, pid).length * (RULES.freeUnitsPerCity + effects(state, pid).freeUnits));
 }
 
 export function playerYields(state, pid) {

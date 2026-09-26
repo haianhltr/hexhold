@@ -11,7 +11,7 @@ import { foundCity, buildReason, buildOptions, processCity, cityMaxHp, upgradeTa
 import { validDistrictTiles } from '../src/core/placement.js';
 import { tileYield, cityYields } from '../src/core/yields.js';
 import { applyAction } from '../src/core/actions.js';
-import { createGame, serialize, deserialize } from '../src/core/state.js';
+import { createGame, serialize, deserialize, SAVE_VERSION } from '../src/core/state.js';
 import { defenseOf, cityDefense } from '../src/core/combat.js';
 import { addScience } from '../src/core/research.js';
 import { checkVictory } from '../src/core/victory.js';
@@ -206,16 +206,19 @@ test('the first civilization to finish Offworld Mission wins a science victory',
   assert.equal(s.winner, 1);
 });
 
-test('saves from 1.1 load with Philosophy removed', () => {
+test('saves from 1.1 load with Philosophy removed and the civics tree added', () => {
   const s = createGame({ seed: 42 });
   const old = JSON.parse(serialize(s));
   old.version = 1;
+  for (const p of old.players) for (const k of ['civic', 'civicPath', 'civics', 'civicProgress', 'cultureOverflow', 'futureCivics', 'government', 'policies', 'freeChanges']) delete p[k];
   old.players[0].techs = ['pottery', 'writing', 'philosophy'];
   old.players[0].progress = { philosophy: 10 };
   old.players[0].research = 'philosophy';
   old.players[0].researchPath = ['philosophy'];
   const loaded = deserialize(JSON.stringify(old));
-  assert.equal(loaded.version, 2);
+  assert.equal(loaded.version, SAVE_VERSION);
+  assert.deepEqual(loaded.players[0].civics, []);
+  assert.equal(loaded.players[0].government, null);
   assert.deepEqual(loaded.players[0].techs, ['pottery', 'writing']);
   assert.equal(loaded.players[0].research, null);
   assert.equal(loaded.players[0].progress.philosophy, undefined);

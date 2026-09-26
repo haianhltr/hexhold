@@ -11,6 +11,9 @@ import { passable } from '../src/core/pathfind.js';
 import { citiesOf } from '../src/core/query.js';
 import { score } from '../src/core/victory.js';
 import { eraOf } from '../src/data/techs.js';
+import { civicEraOf } from '../src/data/civics.js';
+import { GOVERNMENTS, slotsOf, fitsSlot, POLICIES } from '../src/data/government.js';
+import { policiesReason, governmentUnlocked } from '../src/core/civics.js';
 
 const leadEra = (state) => eraOf(state.players.reduce((a, p) => (p.techs.length > a.length ? p.techs : a), [])).name;
 
@@ -45,6 +48,11 @@ function check(state) {
   }
   for (const p of state.players) {
     if (!Number.isFinite(p.gold) || p.gold < 0) problems.push(`${p.name} gold ${p.gold}`);
+    if (p.government && !governmentUnlocked(p, p.government)) problems.push(`${p.name} has a locked government`);
+    if (p.government) {
+      const why = policiesReason(p, p.policies);
+      if (why) problems.push(`${p.name} policies: ${why}`);
+    } else if (p.policies.some(Boolean)) problems.push(`${p.name} has policies without a government`);
   }
   return problems;
 }
@@ -59,6 +67,7 @@ for (let g = 1; g <= games; g++) {
   let wars = 0;
   let captures = 0;
   let era100 = '';
+  let civ100 = '';
   try {
     while (state.phase === 'playing' && state.turn <= turns) {
       const t0 = performance.now();
@@ -66,7 +75,10 @@ for (let g = 1; g <= games; g++) {
       slowest = Math.max(slowest, performance.now() - t0);
       wars += events.filter((e) => e.type === 'war').length;
       captures += events.filter((e) => e.type === 'cityCaptured').length;
-      if (state.turn === 101) era100 = leadEra(state);
+      if (state.turn === 101) {
+        era100 = leadEra(state);
+        civ100 = civicEraOf(state.players.reduce((a, p) => (p.civics.length > a.length ? p.civics : a), [])).name;
+      }
       const problems = check(state);
       if (problems.length) throw new Error(`turn ${state.turn}: ${problems.slice(0, 5).join('; ')}`);
     }
@@ -86,7 +98,9 @@ for (let g = 1; g <= games; g++) {
     alive: alive.length,
     cities: state.players.map((p) => citiesOf(state, p.id).length).join('/'),
     techs: state.players.map((p) => p.techs.length).join('/'),
+    civics: state.players.map((p) => p.civics.length).join('/'),
     era100,
+    civ100,
     era: leadEra(state),
     scores: state.players.map((p) => (p.alive ? score(state, p.id) : '✗')).join('/'),
     wars,

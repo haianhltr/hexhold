@@ -30,12 +30,12 @@ That's **76 techs in 9 eras**, plus a repeatable **Future Tech**.
 | Ancient | 11 | 22–32 | Settling, first farms and mines, bronze weapons |
 | Classical | 8 | 55–70 | Money, cavalry, iron, sea trade, public works |
 | Medieval | 8 | 95–115 | Workshops, universities, knights, castles |
-| Renaissance | 9 | 150–175 | Banking, gunpowder, printing, star forts |
-| Industrial | 8 | 220–250 | Factories, rifles, science as a discipline, steam |
-| Modern | 8 | 330–360 | Electricity, steel, tanks, research labs |
-| Atomic | 8 | 440–480 | Computers, rockets, combined arms |
-| Information | 9 | 560–620 | Satellites, composites, robotics |
-| Future | 7 | 740–960 | The last techs. **Offworld Mission wins the game.** |
+| Renaissance | 9 | 190–220 | Banking, gunpowder, printing, star forts |
+| Industrial | 8 | 275–315 | Factories, rifles, science as a discipline, steam |
+| Modern | 8 | 415–450 | Electricity, steel, tanks, research labs |
+| Atomic | 8 | 610–660 | Computers, rockets, combined arms |
+| Information | 9 | 840–930 | Satellites, composites, robotics |
+| Future | 7 | 1200–1560 | The last techs. **Offworld Mission wins the game.** |
 
 A player's **era** is the latest era in which they have researched at least one tech. It shows in the top bar and in Diplomacy.
 
@@ -67,7 +67,7 @@ A player's **era** is the latest era in which they have researched at least one 
 | Iron Working | 55 | Bronze Working | **Swordsman** |
 | Shipbuilding | 70 | Sailing | **Shipyard** (in a Harbor) |
 | Mathematics | 70 | Currency | **Catapult** |
-| Construction | 70 | Masonry, Horseback Riding | **Theater Square** district, **Amphitheater**. Builders +1 use. |
+| Construction | 70 | Masonry, Horseback Riding | Builders +1 use |
 | Engineering | 70 | The Wheel | **Aqueduct** (+2 Food). Walls +50 HP. |
 
 ## Medieval era
@@ -87,81 +87,81 @@ A player's **era** is the latest era in which they have researched at least one 
 
 | Tech | Cost | Needs | Unlocks |
 |---|---|---|---|
-| Cartography | 150 | Shipbuilding | +1 sight for every unit |
-| Mass Production | 150 | Shipbuilding, Education | Mines and Lumber Mills +1 Production |
-| Banking | 150 | Stirrups, Education | **Bank** |
-| Gunpowder | 150 | Apprenticeship, Stirrups, Military Engineering | **Musketman** |
-| Printing | 150 | Machinery | **Art Museum**, +10% Culture |
-| Square Rigging | 175 | Cartography | Coast tiles +1 Gold |
-| Astronomy | 175 | Education | **Observatory** |
-| Metal Casting | 175 | Gunpowder | **Bombard** |
-| Siege Tactics | 175 | Castles | **Star Fort** (needs Castle) |
+| Cartography | 190 | Shipbuilding | +1 sight for every unit |
+| Mass Production | 190 | Shipbuilding, Education | Mines and Lumber Mills +1 Production |
+| Banking | 190 | Stirrups, Education | **Bank** |
+| Gunpowder | 190 | Apprenticeship, Stirrups, Military Engineering | **Musketman** |
+| Printing | 190 | Machinery | +10% Culture |
+| Square Rigging | 220 | Cartography | Coast tiles +1 Gold |
+| Astronomy | 220 | Education | **Observatory** |
+| Metal Casting | 220 | Gunpowder | **Bombard** |
+| Siege Tactics | 220 | Castles | **Star Fort** (needs Castle) |
 
 ## Industrial era
 
 | Tech | Cost | Needs | Unlocks |
 |---|---|---|---|
-| Industrialization | 220 | Mass Production | **Factory** |
-| Scientific Theory | 220 | Astronomy | +15% Science |
-| Ballistics | 220 | Metal Casting | **Field Cannon** |
-| Military Science | 220 | Printing, Siege Tactics | **Cavalry**, **Military Academy** |
-| Steam Power | 250 | Square Rigging, Industrialization | +1 move for every unit |
-| Sanitation | 250 | Scientific Theory | **Sewer** (+3 Food) |
-| Economics | 250 | Banking, Scientific Theory | **Stock Exchange** |
-| Rifling | 250 | Ballistics, Military Science | **Line Infantry**, **Ranger** |
+| Industrialization | 275 | Mass Production | **Factory** |
+| Scientific Theory | 275 | Astronomy | +15% Science |
+| Ballistics | 275 | Metal Casting | **Field Cannon** |
+| Military Science | 275 | Printing, Siege Tactics | **Cavalry**, **Military Academy** |
+| Steam Power | 315 | Square Rigging, Industrialization | +1 move for every unit |
+| Sanitation | 315 | Scientific Theory | **Sewer** (+3 Food) |
+| Economics | 315 | Banking, Scientific Theory | **Stock Exchange** |
+| Rifling | 315 | Ballistics, Military Science | **Line Infantry**, **Ranger** |
 
 ## Modern era
 
 | Tech | Cost | Needs | Unlocks |
 |---|---|---|---|
-| Flight | 330 | Industrialization, Scientific Theory | +1 sight for every unit |
-| Replaceable Parts | 330 | Economics | **Infantry** |
-| Steel | 330 | Ballistics | **Artillery**. Cities +10 strength. |
-| Electricity | 360 | Steam Power | **Power Plant** |
-| Radio | 360 | Steam Power, Flight | **Broadcast Center** |
-| Chemistry | 360 | Sanitation | **Research Lab**, **Anti-Tank Crew** |
-| Combustion | 360 | Rifling, Steel | **Tank** |
-| Refining | 360 | Rifling | Factories +2 Production |
+| Flight | 415 | Industrialization, Scientific Theory | +1 sight for every unit |
+| Replaceable Parts | 415 | Economics | **Infantry** |
+| Steel | 415 | Ballistics | **Artillery**. Cities +10 strength. |
+| Electricity | 450 | Steam Power | **Power Plant** |
+| Radio | 450 | Steam Power, Flight | **Broadcast Center** |
+| Chemistry | 450 | Sanitation | **Research Lab**, **Anti-Tank Crew** |
+| Combustion | 450 | Rifling, Steel | **Tank** |
+| Refining | 450 | Rifling | Factories +2 Production |
 
 ## Atomic era
 
 | Tech | Cost | Needs | Unlocks |
 |---|---|---|---|
-| Advanced Flight | 440 | Radio | Units heal +10 HP per turn |
-| Rocketry | 440 | Radio, Chemistry | +10% Science |
-| Advanced Ballistics | 440 | Replaceable Parts, Steel | **Machine Gun** |
-| Combined Arms | 440 | Steel, Combustion | Melee units +5 strength |
-| Plastics | 440 | Combustion | Coast tiles +1 Production |
-| Computers | 480 | Electricity, Radio | +10% Science and Culture |
-| Nuclear Fission | 480 | Advanced Ballistics, Combined Arms | +15% Production |
-| Synthetic Materials | 480 | Plastics | +2 Food in every city |
+| Advanced Flight | 610 | Radio | Units heal +10 HP per turn |
+| Rocketry | 610 | Radio, Chemistry | +10% Science |
+| Advanced Ballistics | 610 | Replaceable Parts, Steel | **Machine Gun** |
+| Combined Arms | 610 | Steel, Combustion | Melee units +5 strength |
+| Plastics | 610 | Combustion | Coast tiles +1 Production |
+| Computers | 660 | Electricity, Radio | +10% Science and Culture |
+| Nuclear Fission | 660 | Advanced Ballistics, Combined Arms | +15% Production |
+| Synthetic Materials | 660 | Plastics | +2 Food in every city |
 
 ## Information era
 
 | Tech | Cost | Needs | Unlocks |
 |---|---|---|---|
-| Telecommunications | 560 | Computers | +15% Gold |
-| Satellites | 560 | Advanced Flight, Rocketry | Reveals the whole map. **Mechanized Infantry**. |
-| Guidance Systems | 560 | Rocketry, Advanced Ballistics | **Rocket Artillery** |
-| Lasers | 560 | Nuclear Fission | Ranged and siege units +10 ranged strength |
-| Composites | 560 | Synthetic Materials | **Modern Armor**, **Modern Anti-Tank** |
-| Stealth Technology | 560 | Synthetic Materials | Every unit +5 defense |
-| Robotics | 620 | Computers | +15% Production |
-| Nanotechnology | 620 | Composites | Campus districts +3 Science |
-| Nuclear Fusion | 620 | Lasers | +3 Production in every city |
+| Telecommunications | 840 | Computers | +15% Gold |
+| Satellites | 840 | Advanced Flight, Rocketry | Reveals the whole map. **Mechanized Infantry**. |
+| Guidance Systems | 840 | Rocketry, Advanced Ballistics | **Rocket Artillery** |
+| Lasers | 840 | Nuclear Fission | Ranged and siege units +10 ranged strength |
+| Composites | 840 | Synthetic Materials | **Modern Armor**, **Modern Anti-Tank** |
+| Stealth Technology | 840 | Synthetic Materials | Every unit +5 defense |
+| Robotics | 930 | Computers | +15% Production |
+| Nanotechnology | 930 | Composites | Campus districts +3 Science |
+| Nuclear Fusion | 930 | Lasers | +3 Production in every city |
 
 ## Future era
 
 | Tech | Cost | Needs | Unlocks |
 |---|---|---|---|
-| Seasteads | 740 | Nanotechnology | Coast tiles +2 Food |
-| Advanced AI | 740 | Robotics | +20% Science |
-| Advanced Power Cells | 740 | Nuclear Fusion | +1 move for every unit |
-| Cybernetics | 740 | Robotics | Every unit +5 strength |
-| Smart Materials | 740 | Nanotechnology | +3 Production in every city |
-| Predictive Systems | 740 | Telecommunications | +20% Gold |
-| **Offworld Mission** | 960 | Advanced AI, Advanced Power Cells, Smart Materials, Satellites | **Science victory:** the first civilization to research it wins |
-| Future Tech | 1000 | Everything else | Repeatable, +5 score each. Only reachable when you keep playing after a victory. |
+| Seasteads | 1200 | Nanotechnology | Coast tiles +2 Food |
+| Advanced AI | 1200 | Robotics | +20% Science |
+| Advanced Power Cells | 1200 | Nuclear Fusion | +1 move for every unit |
+| Cybernetics | 1200 | Robotics | Every unit +5 strength |
+| Smart Materials | 1200 | Nanotechnology | +3 Production in every city |
+| Predictive Systems | 1200 | Telecommunications | +20% Gold |
+| **Offworld Mission** | 1560 | Advanced AI, Advanced Power Cells, Smart Materials, Satellites | **Science victory:** the first civilization to research it wins |
+| Future Tech | 1600 | Everything else | Repeatable, +5 score each. Only reachable when you keep playing after a victory. |
 
 ---
 
@@ -216,8 +216,8 @@ Defensive buildings stack on top.
 | Workshop | 80 | Apprenticeship | Industrial Zone | +2 Production |
 | Factory | 170 | Industrialization | Industrial Zone | +4 Production |
 | Power Plant | 230 | Electricity | Industrial Zone | +5 Production |
-| Amphitheater | 80 | Construction | Theater Square | +2 Culture |
-| Art Museum | 140 | Printing | Theater Square | +3 Culture |
+| Amphitheater | 80 | Drama and Poetry (civic) | Theater Square | +2 Culture |
+| Art Museum | 140 | Humanism (civic) | Theater Square | +3 Culture |
 | Broadcast Center | 220 | Radio | Theater Square | +4 Culture |
 | Lighthouse | 60 | Celestial Navigation | Harbor | +2 Food |
 | Shipyard | 90 | Shipbuilding | Harbor | +3 Production |
@@ -232,7 +232,7 @@ A city holds one district per 3 population, rounded up. Every district's yield s
 | Commercial Hub | Currency | Gold | +2 next to coast, +1 per 2 districts | Land |
 | Encampment | Bronze Working | — | Military units build 25% faster | Land, not next to the city center |
 | Industrial Zone | Apprenticeship | Production | +1 per adjacent mine, +1 per 2 districts | Land |
-| Theater Square | Construction | Culture | +1 per 2 districts | Land |
+| Theater Square | Drama and Poetry (civic) | Culture | +1 per 2 districts | Land |
 | Harbor | Celestial Navigation | Gold | +2 next to the city center, +1 per adjacent Fish, +1 per 2 districts | **Coast tile** next to land |
 
 The city center counts as a district for adjacency.
@@ -263,4 +263,4 @@ These are the kinds of bonus a tech can grant. They're data fields in `src/data/
 - A **100-turn** game reaches the Renaissance or Industrial era.
 - A **250-turn** game can reach the Future era, and a strong civilization can launch the Offworld Mission.
 
-The AI-vs-AI soak test checks these targets, and the costs above are tuned against it.
+The AI-vs-AI soak test checks these targets, and the costs above are tuned against it. Governments and policy cards (see [civics-dictionary.md](civics-dictionary.md)) add a lot of science and production, so in 1.3 the costs from the Renaissance era on were raised to keep these targets.

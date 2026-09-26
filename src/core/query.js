@@ -46,6 +46,9 @@ export function owningCity(state, tile) {
 export const citiesOf = (state, pid) => Object.values(state.cities).filter((c) => c.owner === pid);
 export const unitsOf = (state, pid) => Object.values(state.units).filter((u) => u.owner === pid);
 export const hasTech = (state, pid, tech) => !tech || state.players[pid].techs.includes(tech);
+export const hasCivic = (state, pid, civic) => !civic || (state.players[pid].civics || []).includes(civic);
+// Whether a unit, building or district's `tech` and `civic` requirements are both met.
+export const hasUnlock = (state, pid, def) => hasTech(state, pid, def.tech) && hasCivic(state, pid, def.civic);
 export const humanId = (state) => state.players.findIndex((p) => p.human);
 
 export function pairKey(a, b) {

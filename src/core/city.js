@@ -6,12 +6,13 @@ import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS, ENCAMPMENT_PRODUCTION_BONUS } from '../data/districts.js';
 import { CIVS } from '../data/civs.js';
 import { TECHS } from '../data/techs.js';
+import { CIVICS } from '../data/civics.js';
 import { within, distance, neighbors } from './hex.js';
-import { touch, citiesOf, unitsAt, spawnUnit, hasTech, removeUnit } from './query.js';
+import { touch, citiesOf, unitsAt, spawnUnit, hasTech, hasCivic, hasUnlock, removeUnit } from './query.js';
 import { tileYield, cityYields } from './yields.js';
 import { validDistrictTiles, districtLimit, districtsUsed, hasDistrict, adjacencyBonus } from './placement.js';
 import { canEnter, passable } from './pathfind.js';
-import { effects } from './effects.js';
+import { effects, prodBonusPct } from './effects.js';
 
 export function nextCityName(state, pid) {
   const p = state.players[pid];
@@ -122,6 +123,9 @@ export function growthThreshold(pop) {
   return Math.round(RULES.growthBase + RULES.growthPerPop * k + Math.pow(k, RULES.growthExp));
 }
 
+// Food a city needs to grow, after growth bonuses such as Colonial Offices.
+export const cityGrowthThreshold = (state, city) => Math.round((growthThreshold(city.pop) * 100) / (100 + effects(state, city.owner).growthPct));
+
 export const borderThreshold = (city) => RULES.borderBase + RULES.borderPerTile * city.claimed;
 
 export function cityTileCount(state, city) {
@@ -130,7 +134,7 @@ export function cityTileCount(state, city) {
   return n;
 }
 
-export const buyTileCost = (state, city) => RULES.buyTileBase + RULES.buyTilePerTile * Math.max(0, cityTileCount(state, city) - 7);
+export const buyTileCost = (state, city) => Math.round((RULES.buyTileBase + RULES.buyTilePerTile * Math.max(0, cityTileCount(state, city) - 7)) * (1 - effects(state, city.owner).tileDiscount / 100));
 
 export function borderCandidates(state, city) {
   const map = state.map;
@@ -202,7 +206,8 @@ export function upgradeTarget(state, unit) {
   return target;
 }
 
-export const upgradeCost = (from, to) => Math.max(10, (UNITS[to].cost - UNITS[from].cost) * 2);
+// `discount` is a percent off, from policies such as Professional Army.
+export const upgradeCost = (from, to, discount = 0) => Math.max(10, Math.round((UNITS[to].cost - UNITS[from].cost) * 2 * (1 - discount / 100)));
 
 // ---------- production ----------
 
@@ -221,6 +226,7 @@ export function buildReason(state, city, item, inQueue = false) {
   const def = itemDef(item);
   if (!def) return 'Unknown item';
   if (!hasTech(state, city.owner, def.tech)) return `Needs ${TECHS[def.tech].name}`;
+  if (!hasCivic(state, city.owner, def.civic)) return `Needs ${CIVICS[def.civic].name}`;
   const queued = !inQueue && city.queue.some((q) => sameItem(q, item));
   if (item.kind === 'unit' && isObsoleteUnit(state, city.owner, item.key)) return `Replaced by ${UNITS[UNITS[item.key].upgradesTo].name}`;
   if (item.kind === 'building') {
@@ -245,7 +251,7 @@ export function buildReason(state, city, item, inQueue = false) {
 export function buildOptions(state, city) {
   const out = [];
   const add = (kind, key, def) => {
-    if (!hasTech(state, city.owner, def.tech)) return;
+    if (!hasUnlock(state, city.owner, def)) return;
     const item = { kind, key };
     out.push({ ...item, name: def.name, cost: def.cost, info: def.info, reason: buildReason(state, city, item) });
   };
@@ -263,7 +269,7 @@ export function productionRate(state, city, item, yields = cityYields(state, cit
   if (item && item.kind === 'unit' && isMilitary(item.key) && hasDistrict(state, city, 'encampment')) {
     p *= 1 + ENCAMPMENT_PRODUCTION_BONUS;
   }
-  return p;
+  return p * (1 + prodBonusPct(effects(state, city.owner), item) / 100);
 }
 
 export function turnsLeft(state, city, item, yields = cityYields(state, city), stock = city.prodStock) {
@@ -273,7 +279,7 @@ export function turnsLeft(state, city, item, yields = cityYields(state, city), s
   return rate > 0 ? Math.ceil(remaining / rate) : Infinity;
 }
 
-export const buyCost = (city, item) => Math.ceil(Math.max(0, itemCost(item) - city.prodStock) * RULES.goldPerProduction);
+export const buyCost = (state, city, item) => Math.ceil(Math.max(0, itemCost(item) - city.prodStock) * RULES.goldPerProduction * (1 - effects(state, city.owner).buyDiscount / 100));
 
 // Where a newly built unit appears: the city tile if its slot is free, else a free neighbor.
 export function spawnTile(state, city, type) {
@@ -321,7 +327,7 @@ export function completeItem(state, city, item, events) {
     if (isMilitary(item.key)) unit.bonus = city.buildings.reduce((s, b) => s + (BUILDINGS[b].unitBonus || 0), 0);
     if (item.key === 'settler') {
       city.pop--;
-      city.food = Math.min(city.food, growthThreshold(city.pop) - 1);
+      city.food = Math.min(city.food, cityGrowthThreshold(state, city) - 1);
       assignWorkers(state, city);
     }
     events.push({ type: 'built', city: city.id, owner: city.owner, item: { ...item }, unit: unit.id });
@@ -359,8 +365,8 @@ export function processCity(state, city, events) {
       assignWorkers(state, city);
     }
     city.food = 0;
-  } else if (city.food >= growthThreshold(city.pop)) {
-    city.food -= growthThreshold(city.pop);
+  } else if (city.food >= cityGrowthThreshold(state, city)) {
+    city.food -= cityGrowthThreshold(state, city);
     city.pop++;
     events.push({ type: 'grew', city: city.id, owner: city.owner, pop: city.pop });
     assignWorkers(state, city);

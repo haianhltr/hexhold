@@ -5,8 +5,11 @@ import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { IMPROVEMENTS } from '../data/terrain.js';
 import { TECHS, TECH_KEYS } from '../data/techs.js';
+import { CIVICS } from '../data/civics.js';
+import { GOVERNMENTS, POLICIES } from '../data/government.js';
 import { itemName } from '../core/city.js';
 import { techName, canResearchNow } from '../core/research.js';
+import { civicName } from '../core/civics.js';
 import { haveMet } from '../core/query.js';
 
 export function unlocksOf(tech) {
@@ -16,6 +19,16 @@ export function unlocksOf(tech) {
   for (const [k, d] of Object.entries(UNITS)) if (d.tech === tech) out.push({ kind: 'unit', key: k, name: d.name });
   for (const [k, d] of Object.entries(IMPROVEMENTS)) if (d.tech === tech) out.push({ kind: 'improvement', key: k, name: d.name });
   if (TECHS[tech]?.effectText) out.push({ kind: 'effect', name: TECHS[tech].effectText });
+  return out;
+}
+
+export function civicUnlocksOf(civic) {
+  const out = [];
+  for (const [k, g] of Object.entries(GOVERNMENTS)) if (g.civic === civic) out.push({ kind: 'government', key: k, name: g.name });
+  for (const [k, d] of Object.entries(DISTRICTS)) if (d.civic === civic) out.push({ kind: 'district', key: k, name: d.name });
+  for (const [k, d] of Object.entries(BUILDINGS)) if (d.civic === civic) out.push({ kind: 'building', key: k, name: d.name });
+  for (const [k, c] of Object.entries(POLICIES)) if (c.civic === civic) out.push({ kind: `policy ${c.slot}`, key: k, name: c.name });
+  if (CIVICS[civic]?.effectText) out.push({ kind: 'effect', name: CIVICS[civic].effectText });
   return out;
 }
 
@@ -36,6 +49,14 @@ export function describeEvent(s, e, hid) {
       const unlocked = unlocksOf(e.tech).map((u) => u.name);
       return { kind: 'good', icon: 'science', text: `Researched ${techName(e.tech)}.${unlocked.length ? ` Unlocks ${unlocked.join(', ')}.` : ''}`, open: 'tech' };
     }
+    case 'civic': {
+      if (e.player !== hid) return null;
+      const unlocked = civicUnlocksOf(e.civic).map((u) => u.name);
+      return { kind: 'good', icon: 'culture', text: `Completed ${civicName(e.civic)}.${unlocked.length ? ` Unlocks ${unlocked.join(', ')}.` : ''}${e.civic === 'futurecivic' ? '' : ' Policy changes are free this turn.'}`, open: 'government' };
+    }
+    case 'government':
+      if (e.player === hid || !haveMet(s, hid, e.player)) return null;
+      return { kind: 'info', icon: 'culture', text: `${P(e.player)} adopted ${GOVERNMENTS[e.government].name}.` };
     case 'built':
       if (e.owner !== hid) return null;
       return { kind: 'info', icon: 'prod', text: `${cityName(e.city)} finished ${itemName(e.item)}.`, tile: e.unit && s.units[e.unit] ? s.units[e.unit].tile : cityTile(e.city), city: e.city };
@@ -87,6 +108,7 @@ export function describeEvent(s, e, hid) {
 export function eventSound(e, hid, rivalsTurn) {
   switch (e.type) {
     case 'tech':
+    case 'civic':
       return e.player === hid ? 'tech' : null;
     case 'built':
       return e.owner === hid && rivalsTurn ? 'built' : null;

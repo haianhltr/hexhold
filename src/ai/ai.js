@@ -1,11 +1,13 @@
-// AI rivals. Each turn the AI decides on war and peace, picks research, fills city build queues
-// and moves every unit. It only ever changes the game through applyAction, so it plays by the same
+// AI rivals. Each turn the AI decides on war and peace, picks research and civics, runs its
+// government and policy cards, fills city build queues and moves every unit. It only ever changes the game through applyAction, so it plays by the same
 // rules as the human, and it only reacts to what it can see.
 
 import { UNITS, isMilitary, hasTag } from '../data/units.js';
 import { TECHS, TECH_KEYS } from '../data/techs.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS } from '../data/districts.js';
+import { CIVICS, CIVIC_KEYS } from '../data/civics.js';
+import { GOVERNMENTS, POLICIES, slotsOf, fitsSlot } from '../data/government.js';
 import { DIFFICULTY, RULES } from '../data/rules.js';
 import { improvementValid, IMPROVEMENTS } from '../data/terrain.js';
 import { applyAction } from '../core/actions.js';
@@ -16,13 +18,16 @@ import { foundReason, buildOptions, bestDistrictTile, workableTiles, buyCost, ci
 import { attackInfo, inRange, lineOfSight, cityStrikeInfo } from '../core/combat.js';
 import { militaryPower, aiWantsPeace } from '../core/diplomacy.js';
 import { canResearchNow, allResearched } from '../core/research.js';
+import { allCivics, canStudyCivic, availablePolicies, availableGovernments } from '../core/civics.js';
+import { adjacencyBonus } from '../core/placement.js';
 import { startScore } from '../core/mapgen.js';
 import { visibleTiles } from '../core/vision.js';
 import { playerYields } from '../core/yields.js';
+import { effects } from '../core/effects.js';
 
 // How much a building is worth to this AI, per point of production it costs.
 function buildingValue(def, conqueror, broke) {
-  let v = (def.food || 0) * 1.3 + (def.prod || 0) * 1.6 + (def.gold || 0) * (broke ? 2.2 : 1) + (def.science || 0) * (conqueror ? 1.2 : 1.7) + (def.culture || 0) * 0.7;
+  let v = (def.food || 0) * 1.3 + (def.prod || 0) * 1.6 + (def.gold || 0) * (broke ? 2.2 : 1) + (def.science || 0) * (conqueror ? 1.2 : 1.7) + (def.culture || 0) * 1.2;
   if (def.unitBonus) v += conqueror ? 3 : 1;
   return v;
 }
@@ -79,6 +84,8 @@ export function runAI(state, pid, events) {
   diplomacy(ctx);
   if (state.phase === 'ended') return;
   chooseResearch(ctx);
+  chooseCivic(ctx);
+  manageGovernment(ctx);
   manageCities(ctx);
   cityStrikes(ctx);
   moveUnits(ctx);
@@ -201,6 +208,145 @@ function chooseResearch(ctx) {
   if (best) ctx.act({ type: 'research', tech: best });
 }
 
+// ---------- civics, government and policies ----------
+
+const YIELD_WEIGHT = { food: 1.2, prod: 1.4, gold: 1, science: 1.4, culture: 1.2 };
+// Weighted sum of the five yields in `ys` (a yields object, or a building, whose other fields are ignored).
+const weigh = (ys, mult = 1) => (ys ? Object.keys(YIELD_WEIGHT).reduce((v, k) => v + (ys[k] || 0) * YIELD_WEIGHT[k] * mult, 0) : 0);
+
+// What this AI owns, gathered once per turn for valuing effects.
+function holdings(ctx) {
+  if (ctx.held) return ctx.held;
+  const { state, pid } = ctx;
+  const cities = citiesOf(state, pid);
+  const districts = {};
+  const adjacency = {};
+  const buildings = {};
+  const imps = {};
+  for (const c of cities) {
+    for (const t of c.districts) {
+      const d = state.map.tiles[t].district;
+      districts[d] = (districts[d] || 0) + 1;
+      adjacency[d] = (adjacency[d] || 0) + adjacencyBonus(state, t, d);
+    }
+    for (const b of c.buildings) buildings[b] = (buildings[b] || 0) + 1;
+  }
+  for (const t of state.map.tiles) if (t.owner === pid && t.imp) imps[t.imp] = (imps[t.imp] || 0) + 1;
+  const army = unitsOf(state, pid).filter((u) => isMilitary(u.type));
+  const outdated = army.filter((u) => upgradeTarget(state, u)).length;
+  ctx.held = { cities, n: Math.max(1, cities.length), districts, adjacency, buildings, imps, army: army.length, outdated, y: playerYields(state, pid) };
+  return ctx.held;
+}
+
+// Roughly how many yield points per turn an effect is worth to this AI right now.
+function effectValue(ctx, e) {
+  if (!e) return 0;
+  const H = holdings(ctx);
+  const conq = ctx.p.personality === 'conqueror';
+  const war = atWarAny(ctx);
+  let v = weigh(e.cityYield, H.n) + weigh(e.capitalYield) + weigh(e.perDistrict, Object.values(H.districts).reduce((a, b) => a + b, 0));
+  for (const k in e.yieldPct || {}) v += ((H.y[k] || 0) * e.yieldPct[k] * (YIELD_WEIGHT[k] || 1)) / 100;
+  for (const d in e.adjacencyPct || {}) v += ((H.adjacency[d] || 0) * e.adjacencyPct[d] * (YIELD_WEIGHT[DISTRICTS[d].yield] || 1)) / 100;
+  for (const d in e.buildingPct || {}) {
+    for (const b in H.buildings) if (BUILDINGS[b].district === d) v += (weigh(BUILDINGS[b], H.buildings[b]) * e.buildingPct[d]) / 100;
+  }
+  for (const d in e.districtBonus || {}) v += weigh(e.districtBonus[d], H.districts[d] || 0);
+  for (const i in e.improvementBonus || {}) v += weigh(e.improvementBonus[i], H.imps[i] || 0);
+  for (const b in e.buildingBonus || {}) v += weigh(e.buildingBonus[b], H.buildings[b] || 0);
+  // Production bonuses pay off in proportion to how much production goes into matching items.
+  const prod = H.y.prod || 0;
+  const share = { melee: conq ? 0.3 : 0.12, ranged: conq ? 0.2 : 0.1, mounted: conq ? 0.2 : 0.05, antiCav: 0.05, siege: conq ? 0.1 : 0.02, settler: H.n < 4 ? 0.3 : 0.03, builder: 0.08, defense: war ? 0.25 : 0.03, encampment: conq ? 0.08 : 0.02 };
+  for (const k in e.prodBonus || {}) v += (prod * (share[k] ?? 0.05) * e.prodBonus[k] * YIELD_WEIGHT.prod) / 100;
+  const fight = war ? 0.5 : conq ? 0.2 : 0.08;
+  if (e.strength) v += ((e.strength.all || 0) + (e.strength.melee || 0) * 0.6 + (e.strength.defense || 0) * 0.7 + (e.strength.ranged || 0) * 0.4) * H.army * fight;
+  if (e.cityStrength) v += e.cityStrength * H.n * (war ? 0.4 : 0.08);
+  if (e.freeUnits) v += Math.min(e.freeUnits * H.n, H.y.upkeep || 0);
+  if (e.upgradeDiscount) v += (H.outdated * e.upgradeDiscount) / 50;
+  if (e.tileDiscount) v += 0.3;
+  if (e.buyDiscount) v += ((H.y.gold || 0) * e.buyDiscount) / 200;
+  if (e.growthPct) v += (H.n * e.growthPct) / 30;
+  if (e.builderCharges) v += e.builderCharges * 0.5;
+  if (e.heal) v += war ? e.heal / 4 : 0.3;
+  if (e.classMoves || e.moves) v += conq ? 2 : 0.6;
+  if (e.sight) v += 0.5;
+  return v;
+}
+
+function civicValue(ctx, key) {
+  const conq = ctx.p.personality === 'conqueror';
+  let v = 1 + effectValue(ctx, CIVICS[key].effect);
+  for (const g of Object.values(GOVERNMENTS)) if (g.civic === key) v += 6 + g.tier * 4 + (ctx.p.government ? 0 : 20);
+  for (const c of Object.values(POLICIES)) if (c.civic === key) v += 1 + effectValue(ctx, c.effect);
+  for (const d of Object.values(BUILDINGS)) if (d.civic === key) v += buildingValue(d, conq, false) * 0.8;
+  for (const d of Object.values(DISTRICTS)) if (d.civic === key) v += 3.5;
+  return v;
+}
+
+function chooseCivic(ctx) {
+  const { p } = ctx;
+  if (p.civic) return;
+  if (allCivics(p)) {
+    ctx.act({ type: 'civic', civic: 'futurecivic' });
+    return;
+  }
+  let best = null;
+  let bestScore = -Infinity;
+  for (const k of CIVIC_KEYS) {
+    if (!canStudyCivic(p, k)) continue;
+    let v = civicValue(ctx, k);
+    for (const c of CIVIC_KEYS) if (CIVICS[c].req.includes(k)) v += civicValue(ctx, c) * 0.5;
+    const s = v / Math.pow(CIVICS[k].cost, 0.7);
+    if (s > bestScore) {
+      bestScore = s;
+      best = k;
+    }
+  }
+  if (best) ctx.act({ type: 'civic', civic: best });
+}
+
+// The best cards for a government's slots: its own kinds first, then wildcards from what's left.
+function bestPolicies(ctx, gov) {
+  const cards = availablePolicies(ctx.p)
+    .map((k) => ({ k, kind: POLICIES[k].slot, v: effectValue(ctx, POLICIES[k].effect) }))
+    .filter((c) => c.v > 0.05)
+    .sort((a, b) => b.v - a.v || (a.k < b.k ? -1 : 1));
+  const slots = slotsOf(gov);
+  const out = Array(slots.length).fill(null);
+  let value = 0;
+  const used = new Set();
+  const fill = (pass) => slots.forEach((s, i) => {
+    if (out[i] || (pass === 0) !== (s !== 'wildcard')) return;
+    const c = cards.find((x) => !used.has(x.k) && fitsSlot(x.kind, s));
+    if (!c) return;
+    used.add(c.k);
+    out[i] = c.k;
+    value += c.v;
+  });
+  fill(0);
+  fill(1);
+  return { policies: out, value };
+}
+
+// On a free-change turn (or with no government yet), pick the best government and fill its slots.
+function manageGovernment(ctx) {
+  const { p } = ctx;
+  if (p.government && !p.freeChanges) return;
+  const govs = availableGovernments(p);
+  if (!govs.length) return;
+  let best = p.government;
+  let bestScore = best ? effectValue(ctx, GOVERNMENTS[best].effect) + bestPolicies(ctx, best).value + 1 : -Infinity;
+  for (const g of govs) {
+    const s = effectValue(ctx, GOVERNMENTS[g].effect) + bestPolicies(ctx, g).value;
+    if (s > bestScore) {
+      bestScore = s;
+      best = g;
+    }
+  }
+  if (best !== p.government && !ctx.act({ type: 'government', government: best })) return;
+  const { policies } = bestPolicies(ctx, p.government);
+  if (policies.some((k, i) => k !== p.policies[i])) ctx.act({ type: 'policies', policies });
+}
+
 // ---------- cities ----------
 
 function settleSites(ctx) {
@@ -281,7 +427,7 @@ function chooseProduction(ctx, city, counts) {
   const conq = p.personality === 'conqueror';
   const districtOrder = conq
     ? ['encampment', 'industrial', 'campus', 'commercial', 'harbor', 'theater']
-    : ['campus', 'commercial', 'industrial', 'harbor', 'theater', 'encampment'];
+    : ['campus', 'theater', 'commercial', 'industrial', 'harbor', 'encampment'];
   if (broke) districtOrder.unshift('commercial', 'harbor');
   for (const key of districtOrder) {
     if (!has('district', key)) continue;
@@ -342,7 +488,7 @@ function spendGold(ctx) {
   for (const c of citiesOf(state, pid)) {
     const item = c.queue[0];
     if (!item) continue;
-    const cost = buyCost(c, item);
+    const cost = buyCost(state, c, item);
     const urgent = item.kind === 'unit' && isMilitary(item.key) && threatsNear(ctx, c.tile, 4) > 0;
     if ((urgent && p.gold >= cost) || p.gold >= cost + 150) ctx.act({ type: 'buy', city: c.id });
   }
@@ -353,7 +499,7 @@ function spendGold(ctx) {
     .filter((x) => x.to && x.u.moves > 0 && state.map.tiles[x.u.tile].owner === pid)
     .sort((a, b) => UNITS[b.to].strength - UNITS[b.u.type].strength - (UNITS[a.to].strength - UNITS[a.u.type].strength));
   for (const { u, to } of candidates) {
-    if (p.gold - upgradeCost(u.type, to) < reserve) break;
+    if (p.gold - upgradeCost(u.type, to, effects(state, pid).upgradeDiscount) < reserve) break;
     ctx.act({ type: 'upgrade', unit: u.id });
   }
 }

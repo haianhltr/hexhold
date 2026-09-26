@@ -4,20 +4,22 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { TERRAIN, IMPROVEMENTS, RESOURCES, improvementValid } from '../data/terrain.js';
-import { maxMoves } from '../core/effects.js';
+import { maxMoves, effects } from '../core/effects.js';
 import { TECHS, eraOf } from '../data/techs.js';
 import { RULES } from '../data/rules.js';
 import { cityAt, unitsAt, owningCity, hasTech, atWar, yearLabel } from '../core/query.js';
 import { playerYields, cityYields, tileYield } from '../core/yields.js';
-import { foundReason, growthThreshold, borderThreshold, buildOptions, turnsLeft, buyCost, itemName, itemCost, cityMaxHp, borderCandidates, buyTileCost, cityHasStrike, upgradeTarget, upgradeCost } from '../core/city.js';
+import { foundReason, cityGrowthThreshold, borderThreshold, buildOptions, turnsLeft, buyCost, itemName, itemCost, cityMaxHp, borderCandidates, buyTileCost, cityHasStrike, upgradeTarget, upgradeCost } from '../core/city.js';
 import { adjacencyBonus, adjacencyReasons, districtLimit } from '../core/placement.js';
-import { techCost, techName, turnsToResearch } from '../core/research.js';
+import { studyCost, studyName, turnsToStudy } from '../core/research.js';
+import { availablePolicies, availableGovernments } from '../core/civics.js';
+import { POLICIES, slotsOf, fitsSlot } from '../data/government.js';
 import { moveCost, passable } from '../core/pathfind.js';
 import { attackInfo, cityCanStrike, cityDefense, defenseOf } from '../core/combat.js';
 import { visibleTiles } from '../core/vision.js';
 import { within } from '../core/hex.js';
 import { h, clear, fill, icon, emblemSvg, yieldChip, bar, fmt, signed, YIELD_COLORS } from './dom.js';
-import { openTechTree, openDiplomacy, openMenu, openHelp } from './screens.js';
+import { openTechTree, openCivicsTree, openGovernment, openDiplomacy, openMenu, openHelp } from './screens.js';
 
 // ---------- top bar ----------
 
@@ -25,20 +27,23 @@ export function renderTopBar(app) {
   const s = app.state;
   const p = app.human;
   const y = playerYields(s, p.id);
-  const research = p.research;
-  let researchEl;
-  if (research) {
-    const cost = techCost(research);
-    const have = p.progress[research] || 0;
-    const turns = turnsToResearch(p, research, y.science);
-    researchEl = h('button', { type: 'button', class: 'tb-research', title: 'Open the tech tree (T)', onclick: () => openTechTree(app) },
-      h('span', { html: icon('science') }),
+  // Progress toward the current tech and civic; each opens its tree.
+  const progressEl = (track) => {
+    const tech = track === 'tech';
+    const key = tech ? p.research : p.civic;
+    const yieldKey = tech ? 'science' : 'culture';
+    const open = () => (tech ? openTechTree(app) : openCivicsTree(app));
+    const title = tech ? 'Open the tech tree (T)' : 'Open the civics tree (V)';
+    if (!key) return h('button', { type: 'button', class: `tb-research tb-${track} needs`, title, onclick: open }, h('span', { html: icon(yieldKey) }), tech ? 'Choose research' : 'Choose a civic');
+    const cost = studyCost(key, track);
+    const have = (tech ? p.progress : p.civicProgress)[key] || 0;
+    const turns = turnsToStudy(p, key, y[yieldKey], track);
+    return h('button', { type: 'button', class: `tb-research tb-${track}`, title, onclick: open },
+      h('span', { html: icon(yieldKey) }),
       h('span', { class: 'tb-research-body' },
-        h('span', { class: 'tb-research-name' }, techName(research), h('small', {}, Number.isFinite(turns) ? ` · ${turns} turn${turns === 1 ? '' : 's'}` : '')),
-        bar(have / cost, YIELD_COLORS.science, 'Research progress')));
-  } else {
-    researchEl = h('button', { type: 'button', class: 'tb-research needs', onclick: () => openTechTree(app) }, h('span', { html: icon('science') }), 'Choose research');
-  }
+        h('span', { class: 'tb-research-name' }, studyName(key, track), h('small', {}, Number.isFinite(turns) ? ` · ${turns} turn${turns === 1 ? '' : 's'}` : '')),
+        bar(have / cost, YIELD_COLORS[yieldKey], tech ? 'Research progress' : 'Civic progress')));
+  };
   const hasCities = y.science > 0;
   fill(app.topbar, 
     h('div', { class: 'tb-civ', title: `You lead ${p.name}` }, h('span', { html: emblemSvg(p.emblem, p.color, 20) }), h('b', {}, p.name)),
@@ -47,14 +52,21 @@ export function renderTopBar(app) {
       yieldChip('culture', y.culture, { signed: true, title: 'Culture per turn' }),
       h('span', { class: 'yield y-gold', title: `Gold ${Math.floor(p.gold)}. ${signed(y.goldNet)} per turn after ${y.upkeep} gold of unit upkeep.` },
         h('span', { html: icon('gold') }), h('b', {}, String(Math.floor(p.gold))), hasCities ? h('small', {}, `${signed(y.goldNet)}`) : null)),
-    researchEl,
-    h('div', { class: 'tb-turn', title: `Game ends after turn ${s.turnLimit}` }, h('b', {}, `Turn ${s.turn}`), h('small', {}, ` / ${s.turnLimit} · ${yearLabel(s)} · ${eraOf(p.techs).name} Era`)),
+    h('div', { class: 'tb-progress' }, progressEl('tech'), progressEl('civic')),
+    h('div', { class: 'tb-turn', title: `Game ends after turn ${s.turnLimit}. ${eraOf(p.techs).name} Era.` }, h('b', {}, `Turn ${s.turn}`), h('small', {}, ` / ${s.turnLimit} · ${yearLabel(s)}`), h('small', { class: 'tb-era' }, ` · ${eraOf(p.techs).name} Era`)),
     h('nav', { class: 'tb-actions', 'aria-label': 'Game menus' },
-      h('button', { type: 'button', class: 'btn ghost', onclick: () => openTechTree(app), title: 'Tech tree (T)' }, 'Tech'),
+      h('button', { type: 'button', class: `btn ghost${govNeedsAttention(p) ? ' attention' : ''}`, onclick: () => openGovernment(app), title: 'Government and policies (G)' }, 'Government'),
       h('button', { type: 'button', class: 'btn ghost', onclick: () => openDiplomacy(app), title: 'Diplomacy (P)' }, 'Diplomacy'),
       h('button', { type: 'button', class: 'btn ghost', onclick: () => openHelp(app), title: 'How to play (H)' }, 'Help'),
       h('button', { type: 'button', class: 'btn ghost icon-btn', onclick: () => openMenu(app), title: 'Menu (Esc)', 'aria-label': 'Menu', html: icon('menu') })),
   );
+}
+
+// A government to choose, or empty policy slots with cards to fill them.
+export function govNeedsAttention(p) {
+  const avail = availablePolicies(p);
+  if (!p.government) return availableGovernments(p).length > 0;
+  return slotsOf(p.government).some((kind, i) => !p.policies[i] && avail.some((k) => fitsSlot(POLICIES[k].slot, kind) && !p.policies.includes(k)));
 }
 
 // ---------- unit panel ----------
@@ -90,7 +102,7 @@ export function renderUnitPanel(app) {
   }
   const upTo = upgradeTarget(s, u);
   if (upTo) {
-    const cost = upgradeCost(u.type, upTo);
+    const cost = upgradeCost(u.type, upTo, effects(s, u.owner).upgradeDiscount);
     const why = s.map.tiles[u.tile].owner !== u.owner ? 'Only inside your borders' : u.moves <= 0 ? 'No moves left this turn' : p.gold < cost ? `Needs ${cost} gold` : null;
     add(`Upgrade to ${UNITS[upTo].name} (${cost} gold)`, 'U', () => app.unitCommand('upgrade'), why, 'primary');
   }
@@ -151,7 +163,7 @@ export function renderCityPanel(app) {
   const scroller = panel.querySelector('.cp-scroll');
   const scrollTop = scroller ? scroller.scrollTop : 0;
   const y = cityYields(s, c);
-  const growTh = growthThreshold(c.pop);
+  const growTh = cityGrowthThreshold(s, c);
   const growTurns = y.surplus > 0 ? Math.ceil((growTh - c.food) / y.surplus) : null;
   const bTh = borderThreshold(c);
   const bTurns = y.culture > 0 ? Math.max(1, Math.ceil((bTh - c.culture) / y.culture)) : null;
@@ -184,7 +196,7 @@ export function renderCityPanel(app) {
   if (item) {
     const cost = itemCost(item);
     const turns = turnsLeft(s, c, item, y);
-    const gold = buyCost(c, item);
+    const gold = buyCost(s, c, item);
     current = h('div', { class: 'cp-current' },
       h('div', { class: 'row-between' }, h('b', {}, itemName(item)), h('span', { class: 'small muted' }, Number.isFinite(turns) ? `${turns} turn${turns === 1 ? '' : 's'}` : 'Stalled')),
       bar(Math.min(1, c.prodStock / cost), YIELD_COLORS.prod, 'Production progress'),
@@ -289,6 +301,14 @@ export function renderEndTurn(app) {
       label = 'Choose research';
       sub = 'Opens the tech tree';
       cls += ' blocked';
+    } else if (b?.kind === 'civic') {
+      label = 'Choose a civic';
+      sub = 'Opens the civics tree';
+      cls += ' blocked';
+    } else if (b?.kind === 'government') {
+      label = 'Choose a government';
+      sub = 'Opens the government screen';
+      cls += ' blocked';
     }
   }
   btn.className = cls;
@@ -305,6 +325,8 @@ export function renderNotes(app) {
   for (const n of notes) {
     const open = () => {
       if (n.open === 'tech') openTechTree(app);
+      else if (n.open === 'civic') openCivicsTree(app);
+      else if (n.open === 'government') openGovernment(app);
       else if (n.open === 'diplomacy') openDiplomacy(app);
       else if (n.city != null && app.state.cities[n.city]?.owner === app.humanId) app.selectCity(app.state.cities[n.city], { center: true });
       else if (n.tile != null) app.renderer.centerOn(n.tile);

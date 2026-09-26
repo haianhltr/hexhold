@@ -1,22 +1,25 @@
-// Full-screen and modal screens: title, setup, tech tree, diplomacy, menu, saves, settings,
-// help, game over, and small confirmation dialogs.
+// Full-screen and modal screens: title, setup, tech and civics trees, government, diplomacy, menu,
+// saves, settings, help, game over, and small confirmation dialogs.
 
 import { CIVS } from '../data/civs.js';
 import { TECHS, TECH_KEYS, ERAS, ERA_INDEX, eraOf } from '../data/techs.js';
+import { CIVICS, CIVIC_KEYS, civicEraOf } from '../data/civics.js';
+import { GOVERNMENTS, GOVERNMENT_KEYS, POLICIES, POLICY_KEYS, SLOT_TYPES, SLOT_NAMES, slotsOf, fitsSlot } from '../data/government.js';
 import { UNITS } from '../data/units.js';
 import { DIFFICULTY, MAP_SIZES, TURN_LIMITS, TURN_LIMIT_LABELS, RULES } from '../data/rules.js';
 import { atWar, haveMet, citiesOf, yearLabel } from '../core/query.js';
 import { playerYields } from '../core/yields.js';
-import { techCost, techName, canResearchNow, turnsToResearch, researchPath, allResearched } from '../core/research.js';
+import { studyCost, canStudyNow, turnsToStudy } from '../core/research.js';
+import { availablePolicies, governmentUnlocked, governmentChangeCost, policyChangeCost, policySwapCost } from '../core/civics.js';
 import { militaryPower } from '../core/diplomacy.js';
 import { score, scoreBreakdown, rankings } from '../core/victory.js';
 import { seedFromText } from '../core/rng.js';
 import * as storage from '../save/storage.js';
 import { h, clear, fill, icon, emblemSvg, bar, fmt, YIELD_COLORS } from './dom.js';
-import { unlocksOf } from './events.js';
+import { unlocksOf, civicUnlocksOf } from './events.js';
 import { setVolume, sfx, unlockAudio } from './sound.js';
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 // ---------- title & setup ----------
 
@@ -119,27 +122,43 @@ export function peaceOfferModal(app, offer) {
       h('button', { type: 'button', class: 'btn', onclick: () => respond(false) }, 'Keep fighting'))), { label: 'Peace offer', closable: false });
 }
 
-// ---------- tech tree ----------
+// ---------- tech and civics trees ----------
 
-// Card grid geometry for the tech timeline, in pixels.
+// The two research trees share one timeline screen. Each track names its data and wording.
+const TREES = {
+  tech: {
+    table: TECHS, keys: TECH_KEYS, done: 'techs', progress: 'progress', current: 'research', path: 'researchPath', future: 'future',
+    futureKey: 'future', futureName: 'Future Tech', yield: 'science', title: 'Technologies', label: 'Tech tree', noun: 'tech', nouns: 'techs',
+    action: (key) => ({ type: 'research', tech: key }), unlocks: (key) => unlocksOf(key), era: (p) => eraOf(p.techs),
+  },
+  civic: {
+    table: CIVICS, keys: CIVIC_KEYS, done: 'civics', progress: 'civicProgress', current: 'civic', path: 'civicPath', future: 'futureCivics',
+    futureKey: 'futurecivic', futureName: 'Future Civic', yield: 'culture', title: 'Civics', label: 'Civics tree', noun: 'civic', nouns: 'civics',
+    action: (key) => ({ type: 'civic', civic: key }), unlocks: (key) => civicUnlocksOf(key), era: (p) => civicEraOf(p.civics),
+  },
+};
+
+// Card grid geometry for the timelines, in pixels.
 const TT = { w: 214, h: 82, colGap: 50, rowGap: 12, head: 30, pad: 10 };
 
-// Places every tech on a column/row grid. Columns follow prerequisites (a tech sits right of
-// everything it needs) and never mix eras; rows are ordered so lines cross as little as possible.
-// The result depends only on the tech data, so it is computed once.
-let techLayout = null;
-function layoutTechs() {
-  if (techLayout) return techLayout;
+// Places every item of a tree on a column/row grid. Columns follow prerequisites (an item sits
+// right of everything it needs) and never mix eras; rows are ordered so lines cross as little as
+// possible. The result depends only on the data, so it is computed once per tree.
+const layouts = {};
+function layoutTree(track) {
+  if (layouts[track]) return layouts[track];
+  const { table, keys: all, futureKey } = TREES[track];
   const col = {};
   const eras = [];
   let start = 0;
   for (const era of ERAS) {
-    const keys = TECH_KEYS.filter((k) => TECHS[k].era === era.key);
+    const keys = all.filter((k) => table[k].era === era.key);
+    if (!keys.length) continue;
     for (const k of keys) col[k] = start;
     for (let changed = true; changed; ) {
       changed = false;
       for (const k of keys) {
-        const c = Math.max(start, ...TECHS[k].req.map((r) => col[r] + 1));
+        const c = Math.max(start, ...table[k].req.map((r) => col[r] + 1));
         if (c !== col[k]) {
           col[k] = c;
           changed = true;
@@ -151,11 +170,11 @@ function layoutTechs() {
     start = end + 1;
   }
   const cols = [];
-  for (const k of TECH_KEYS) (cols[col[k]] ||= []).push(k);
+  for (const k of all) (cols[col[k]] ||= []).push(k);
   const children = {};
-  for (const k of TECH_KEYS) for (const r of TECHS[k].req) (children[r] ||= []).push(k);
+  for (const k of all) for (const r of table[k].req) (children[r] ||= []).push(k);
 
-  // Barycenter ordering: each tech wants to sit level with the techs it connects to. Rows are whole
+  // Barycenter ordering: each item wants to sit level with the items it connects to. Rows are whole
   // numbers within the height of the fullest column, so the tree stays compact.
   const rows = Math.max(...cols.map((c) => c.length));
   const row = {};
@@ -169,72 +188,79 @@ function layoutTechs() {
   const mean = (list) => (list && list.length ? list.reduce((s, k) => s + row[k], 0) / list.length : null);
   cols[0].forEach((k, i) => (row[k] = i));
   for (let pass = 0; pass < 4; pass++) {
-    for (let c = 1; c < cols.length; c++) place(cols[c], (k) => mean(TECHS[k].req));
+    for (let c = 1; c < cols.length; c++) place(cols[c], (k) => mean(table[k].req));
     for (let c = cols.length - 2; c >= 0; c--) place(cols[c], (k) => mean((children[k] || []).filter((x) => row[x] != null)));
   }
-  for (let c = 1; c < cols.length; c++) place(cols[c], (k) => mean(TECHS[k].req));
+  for (let c = 1; c < cols.length; c++) place(cols[c], (k) => mean(table[k].req));
   const pos = {};
-  for (const k of TECH_KEYS) pos[k] = { col: col[k], row: row[k] };
-  const last = TECH_KEYS.find((k) => TECHS[k].effect?.victory) || TECH_KEYS[TECH_KEYS.length - 1];
-  pos.future = { col: cols.length, row: pos[last].row };
-  techLayout = { pos, eras, cols: cols.length + 1, rows };
-  return techLayout;
+  for (const k of all) pos[k] = { col: col[k], row: row[k] };
+  const last = all.find((k) => table[k].effect?.victory) || all[all.length - 1];
+  pos[futureKey] = { col: cols.length, row: pos[last].row };
+  layouts[track] = { pos, eras, cols: cols.length + 1, rows, last };
+  return layouts[track];
 }
 
 const techX = (col) => TT.pad + col * (TT.w + TT.colGap);
 const techY = (row) => TT.head + TT.pad + row * (TT.h + TT.rowGap);
 
-export function openTechTree(app) {
+export const openTechTree = (app) => openTree(app, 'tech');
+export const openCivicsTree = (app) => openTree(app, 'civic');
+
+export function openTree(app, track) {
   if (!app.state) return;
+  const T = TREES[track];
   const s = app.state;
   const p = app.human;
-  const perTurn = playerYields(s, p.id).science;
-  const path = p.researchPath || [];
-  const { pos, eras, cols, rows } = layoutTechs();
+  const perTurn = playerYields(s, p.id)[T.yield];
+  const done = p[T.done];
+  const path = p[T.path] || [];
+  const { pos, eras, cols, rows, last } = layoutTree(track);
   const width = techX(cols) - TT.colGap + TT.pad;
   const height = techY(rows) - TT.rowGap + TT.pad;
   const cards = new Map();
+  const era = T.era(p);
 
   const pick = (key) => {
-    if (app.dispatch({ type: 'research', tech: key }).ok) {
+    if (app.dispatch(T.action(key)).ok) {
       sfx.click();
-      openTechTree(app);
+      openTree(app, track);
     }
   };
   const card = (key) => {
-    const future = key === 'future';
-    const t = TECHS[key];
-    const done = !future && p.techs.includes(key);
-    const current = p.research === key;
+    const future = key === T.futureKey;
+    const t = T.table[key];
+    const isDone = !future && done.includes(key);
+    const current = p[T.current] === key;
     const queued = !current && path.includes(key);
-    const available = future ? allResearched(p) : canResearchNow(p, key);
-    const state = done ? 'done' : current ? 'current' : queued ? 'queued' : available ? 'available' : 'locked';
-    const turns = done ? null : turnsToResearch(p, key, perTurn);
-    const progress = p.progress[key] || 0;
+    const available = canStudyNow(p, key, track);
+    const state = isDone ? 'done' : current ? 'current' : queued ? 'queued' : available ? 'available' : 'locked';
+    const turns = isDone ? null : turnsToStudy(p, key, perTurn, track);
+    const progress = p[T.progress][key] || 0;
     let status;
-    if (future) status = available ? `Repeatable · ${p.future} researched` : 'Research every tech first';
-    else if (done) status = 'Researched';
+    if (future) status = available ? `Repeatable · ${p[T.future] || 0} researched` : `Research every ${T.noun} first`;
+    else if (isDone) status = 'Researched';
     else if (current) status = `Researching · ${turns} turn${turns === 1 ? '' : 's'}`;
     else if (queued) status = `Queued · ${turns} turns`;
     else if (available) status = `${Number.isFinite(turns) ? turns : '–'} turns`;
-    else status = `${Number.isFinite(turns) ? turns : '–'} turns · needs ${t.req.filter((r) => !p.techs.includes(r)).map((r) => TECHS[r].name).join(', ')}`;
-    const unlocks = future ? [{ kind: 'effect', name: `+${RULES.score.future} score each` }] : unlocksOf(key);
+    else status = `${Number.isFinite(turns) ? turns : '–'} turns · needs ${t.req.filter((r) => !done.includes(r)).map((r) => T.table[r].name).join(', ')}`;
+    const unlocks = future ? [{ kind: 'effect', name: `+${RULES.score.future} score each` }] : T.unlocks(key);
+    const name = future ? T.futureName : t.name;
     const where = pos[key];
     const el = h('button', {
       type: 'button',
-      class: `tech ${state}${t?.effect?.victory ? ' victory' : ''}`,
-      disabled: done || (future && !available),
+      class: `tech ${track} ${state}${t?.effect?.victory ? ' victory' : ''}`,
+      disabled: isDone || (future && !available),
       'aria-pressed': current ? 'true' : 'false',
       'data-tech': key,
-      title: `${future ? 'Future Tech' : t.name}. ${status}.${unlocks.length ? ` Unlocks: ${unlocks.map((u) => u.name).join(', ')}.` : ''}`,
+      title: `${name}. ${status}.${unlocks.length ? ` Unlocks: ${unlocks.map((u) => u.name).join(', ')}.` : ''}`,
       style: { left: `${techX(where.col)}px`, top: `${techY(where.row)}px`, width: `${TT.w}px`, height: `${TT.h}px` },
       onclick: () => pick(key),
     },
-      h('span', { class: 'tech-name' }, future ? 'Future Tech' : t.name),
+      h('span', { class: 'tech-name' }, name),
       h('span', { class: 'tech-status' }, status),
-      current || progress ? bar(progress / techCost(key), YIELD_COLORS.science, 'Progress') : null,
+      current || progress ? bar(progress / studyCost(key, track), YIELD_COLORS[T.yield], 'Progress') : null,
       h('span', { class: 'tech-unlocks' }, ...unlocks.map((u) => h('span', { class: `chip ${u.kind}` }, u.name))),
-      h('span', { class: 'tech-cost' }, `${techCost(key)}`, h('span', { html: icon('science') })));
+      h('span', { class: 'tech-cost' }, `${studyCost(key, track)}`, h('span', { html: icon(T.yield) })));
     cards.set(key, el);
     return el;
   };
@@ -251,32 +277,31 @@ export function openTechTree(app) {
     const mx = x2 - TT.colGap / 2;
     lines += `<path class="${cls}" d="M${x1} ${y1}H${mx}${y1 === y2 ? '' : `C${mx + 12} ${y1} ${mx + 12} ${y2} ${mx + 24} ${y2}`}H${x2}"/>`;
   };
-  for (const k of TECH_KEYS) for (const r of TECHS[k].req) link(r, k, p.techs.includes(k) ? 'done' : p.techs.includes(r) ? 'open' : path.includes(k) ? 'queued' : '');
-  const lastKey = TECH_KEYS.find((k) => TECHS[k].effect?.victory);
-  if (lastKey) link(lastKey, 'future', p.techs.includes(lastKey) ? 'open' : '');
+  for (const k of T.keys) for (const r of T.table[k].req) link(r, k, done.includes(k) ? 'done' : done.includes(r) ? 'open' : path.includes(k) ? 'queued' : '');
+  link(last, T.futureKey, done.includes(last) ? 'open' : '');
 
   const bands = eras.map((e, i) => {
     const left = techX(e.from) - TT.colGap / 2 + (i === 0 ? TT.colGap / 2 - TT.pad : 0);
     const right = techX(e.to) + TT.w + TT.colGap / 2;
-    const reached = i <= ERA_INDEX[eraOf(p.techs).key];
+    const reached = ERA_INDEX[e.key] <= ERA_INDEX[era.key];
     return h('div', { class: `era-band${i % 2 ? ' alt' : ''}${reached ? ' reached' : ''}`, 'data-era': e.key, style: { left: `${left}px`, width: `${right - left}px`, height: `${height}px` } },
       h('span', { class: 'era-name' }, `${e.name} Era`));
   });
   const svg = `<svg class="tech-lines" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lines}</svg>`;
   const canvas = h('div', { class: 'tech-canvas', style: { width: `${width}px`, height: `${height}px` } },
-    ...bands, h('div', { html: svg, style: { display: 'contents' } }), ...TECH_KEYS.map(card), card('future'));
+    ...bands, h('div', { html: svg, style: { display: 'contents' } }), ...T.keys.map(card), card(T.futureKey));
   const scroller = h('div', { class: 'tech-scroll' }, canvas);
 
   const scrollToCol = (col, smooth = true) => scroller.scrollTo({ left: Math.max(0, techX(col) - scroller.clientWidth / 2 + TT.w / 2), behavior: smooth ? 'smooth' : 'auto' });
   const eraNav = h('div', { class: 'era-nav', role: 'group', 'aria-label': 'Jump to era' }, ...eras.map((e) =>
-    h('button', { type: 'button', class: `btn small ghost${e.key === eraOf(p.techs).key ? ' active' : ''}`, onclick: () => scrollToCol((e.from + e.to) / 2) }, e.name)));
+    h('button', { type: 'button', class: `btn small ghost${e.key === era.key ? ' active' : ''}`, onclick: () => scrollToCol((e.from + e.to) / 2) }, e.name)));
 
-  const search = h('input', { type: 'search', class: 'tech-search', placeholder: 'Search techs and unlocks', 'aria-label': 'Search techs and unlocks' });
+  const search = h('input', { type: 'search', class: 'tech-search', placeholder: `Search ${T.nouns} and unlocks`, 'aria-label': `Search ${T.nouns} and unlocks` });
   search.addEventListener('input', () => {
     const q = search.value.trim().toLowerCase();
     let first = null;
     for (const [key, el] of cards) {
-      const text = key === 'future' ? 'future tech' : `${TECHS[key].name} ${unlocksOf(key).map((u) => u.name).join(' ')}`.toLowerCase();
+      const text = key === T.futureKey ? T.futureName.toLowerCase() : `${T.table[key].name} ${T.unlocks(key).map((u) => u.name).join(' ')}`.toLowerCase();
       const hit = q.length > 1 && text.includes(q);
       el.classList.toggle('match', hit);
       el.classList.toggle('dim', q.length > 1 && !hit);
@@ -285,18 +310,134 @@ export function openTechTree(app) {
     if (first) scrollToCol(pos[first].col);
   });
 
-  const era = eraOf(p.techs);
-  const content = h('div', { class: 'tech-tree' },
+  // Switch between the two trees without closing the screen.
+  const other = track === 'tech' ? 'civic' : 'tech';
+  const switcher = h('button', { type: 'button', class: 'btn small', onclick: () => openTree(app, other), title: other === 'tech' ? 'Tech tree (T)' : 'Civics tree (V)' }, `${TREES[other].title} →`);
+  const extra = track === 'civic' ? h('button', { type: 'button', class: 'btn small', onclick: () => openGovernment(app), title: 'Government (G)' }, 'Government') : null;
+
+  const content = h('div', { class: `tech-tree ${track}-tree` },
     h('div', { class: 'tech-head' },
-      h('div', {}, h('h2', {}, 'Technologies'),
-        h('p', { class: 'small muted' }, `${era.name} Era · ${fmt(perTurn)} science per turn · ${p.techs.length}/${TECH_KEYS.length} researched. Pick any tech; the techs it needs are researched first.`)),
-      search),
+      h('div', {}, h('h2', {}, T.title),
+        h('p', { class: 'small muted' }, `${era.name} Era · ${fmt(perTurn)} ${T.yield} per turn · ${done.length}/${T.keys.length} researched. Pick any ${T.noun}; the ${T.nouns} it needs are researched first.`)),
+      h('div', { class: 'row tech-tools' }, search, extra, switcher)),
     eraNav,
     scroller);
-  app.openModal(content, { full: true, label: 'Tech tree' });
-  // Open on what the player is working toward: the current research, else the frontier.
-  const focus = p.research && pos[p.research] ? p.research : TECH_KEYS.find((k) => canResearchNow(p, k)) || 'future';
+  app.openModal(content, { full: true, label: T.label });
+  // Open on what the player is working toward: the current item, else the frontier.
+  const focus = p[T.current] && pos[p[T.current]] ? p[T.current] : T.keys.find((k) => canStudyNow(p, k, track)) || T.futureKey;
   requestAnimationFrame(() => scrollToCol(pos[focus].col, false));
+}
+
+// ---------- government ----------
+
+// Pick a government and slot policy cards. Changes are drafted on the screen and applied with
+// Confirm, which shows what they cost.
+export function openGovernment(app, draft = null, selected = null, filter = 'all') {
+  if (!app.state) return;
+  const s = app.state;
+  const p = app.human;
+  const gov = p.government ? GOVERNMENTS[p.government] : null;
+  const slots = slotsOf(p.government);
+  draft = draft && draft.length === slots.length ? draft : [...(p.policies || [])];
+  const rerender = (d = draft, sel = selected, f = filter) => openGovernment(app, d, sel, f);
+  const cost = policyChangeCost(p, draft);
+  const dirty = draft.some((k, i) => k !== (p.policies || [])[i]);
+
+  const place = (key) => {
+    const kind = POLICIES[key].slot;
+    const next = [...draft];
+    const at = next.indexOf(key);
+    if (at >= 0) {
+      next[at] = null;
+      return rerender(next, at);
+    }
+    let i = selected != null && fitsSlot(kind, slots[selected]) ? selected : -1;
+    if (i < 0) i = slots.findIndex((sl, j) => !next[j] && sl === kind);
+    if (i < 0) i = slots.findIndex((sl, j) => !next[j] && fitsSlot(kind, sl));
+    if (i < 0) {
+      app.toast(`No free slot for ${POLICIES[key].name}. Click a ${SLOT_NAMES[kind].toLowerCase()}${kind === 'wildcard' ? '' : ' or wildcard'} slot first to replace its card.`, 'error');
+      return;
+    }
+    next[i] = key;
+    sfx.click();
+    rerender(next, null);
+  };
+
+  const policyCard = (key, { slotted = false, index = null } = {}) => {
+    const d = POLICIES[key];
+    return h('div', { class: `policy ${d.slot}${slotted ? ' slotted' : ''}` },
+      h('b', {}, d.name),
+      h('span', {}, d.effectText),
+      index != null ? h('button', { type: 'button', class: 'policy-remove', 'aria-label': `Remove ${d.name}`, onclick: (e) => { e.stopPropagation(); const next = [...draft]; next[index] = null; rerender(next, index); } }, '×') : null);
+  };
+
+  const slotEls = slots.map((kind, i) => h('button', {
+    type: 'button',
+    class: `slot ${kind}${selected === i ? ' selected' : ''}${draft[i] ? '' : ' empty'}`,
+    'aria-label': `${SLOT_NAMES[kind]} slot ${draft[i] ? `: ${POLICIES[draft[i]].name}` : '(empty)'}`,
+    onclick: () => rerender(draft, selected === i ? null : i),
+  }, draft[i] ? policyCard(draft[i], { slotted: true, index: i }) : h('span', { class: 'slot-empty' }, `Empty ${SLOT_NAMES[kind]} slot`)));
+
+  const cards = availablePolicies(p)
+    .filter((k) => filter === 'all' || POLICIES[k].slot === filter)
+    .sort((a, b) => ['military', 'economic', 'wildcard'].indexOf(POLICIES[a].slot) - ['military', 'economic', 'wildcard'].indexOf(POLICIES[b].slot) || POLICY_KEYS.indexOf(a) - POLICY_KEYS.indexOf(b));
+  const fitsAnywhere = (k) => slots.some((sl) => fitsSlot(POLICIES[k].slot, sl));
+  const cardEls = cards.map((k) => h('button', {
+    type: 'button',
+    class: `policy-pick${draft.includes(k) ? ' in' : ''}${fitsAnywhere(k) ? '' : ' nofit'}`,
+    disabled: !fitsAnywhere(k),
+    title: fitsAnywhere(k) ? (draft.includes(k) ? 'Slotted. Click to remove.' : 'Click to slot') : `${gov ? gov.name : 'This government'} has no slot for this card`,
+    onclick: () => place(k),
+  }, policyCard(k)));
+
+  const tabs = h('div', { class: 'era-nav', role: 'group', 'aria-label': 'Filter cards' }, ...['all', 'military', 'economic', 'wildcard'].map((f) =>
+    h('button', { type: 'button', class: `btn small ghost${filter === f ? ' active' : ''}`, onclick: () => rerender(draft, selected, f) }, f === 'all' ? 'All cards' : SLOT_NAMES[f])));
+
+  const status = !p.government
+    ? 'Choose your first government. It’s free.'
+    : p.freeChanges
+      ? 'You finished a civic, so changes are free this turn.'
+      : `Each newly slotted card costs ${policySwapCost(p)} gold this turn. Removing cards is free. Changes are free on the turn you finish a civic.`;
+
+  const govCards = GOVERNMENT_KEYS.map((k) => {
+    const d = GOVERNMENTS[k];
+    const unlocked = governmentUnlocked(p, k);
+    const current = p.government === k;
+    const price = governmentChangeCost(p);
+    return h('div', { class: `gov${current ? ' current' : ''}${unlocked ? '' : ' locked'}` },
+      h('div', { class: 'gov-head' }, h('b', {}, d.name), h('span', { class: 'gov-tier' }, d.tier ? `Tier ${d.tier}` : 'Start')),
+      h('div', { class: 'gov-slots', 'aria-label': `${d.slots[0]} military, ${d.slots[1]} economic, ${d.slots[2]} wildcard slots` },
+        ...SLOT_TYPES.flatMap((kind, j) => Array.from({ length: d.slots[j] }, () => h('i', { class: kind, title: SLOT_NAMES[kind] })))),
+      h('span', { class: 'small' }, d.effectText),
+      current ? h('span', { class: 'small good-text' }, 'Current government')
+        : unlocked ? h('button', { type: 'button', class: 'btn small', onclick: () => { if (app.dispatch({ type: 'government', government: k }).ok) { sfx.click(); openGovernment(app); } } }, price ? `Adopt (${price} gold)` : 'Adopt')
+          : h('span', { class: 'small muted' }, `Needs ${CIVICS[d.civic].name}`));
+  });
+
+  const confirm = () => {
+    if (app.dispatch({ type: 'policies', policies: draft }).ok) {
+      sfx.click();
+      openGovernment(app);
+    }
+  };
+  const content = h('div', { class: 'stack government' },
+    h('div', { class: 'row-between gov-top' },
+      h('div', {}, h('h2', {}, gov ? gov.name : 'Government'), h('p', { class: 'small muted' }, gov ? `${gov.effectText}. ${status}` : status)),
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'btn small', onclick: () => openCivicsTree(app), title: 'Civics tree (V)' }, 'Civics tree'))),
+    gov ? h('section', { class: 'stack' },
+      h('h3', {}, 'Policy slots'),
+      h('div', { class: 'slots' }, ...slotEls),
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'btn primary', disabled: !dirty, onclick: confirm }, dirty ? (cost ? `Confirm changes (${cost} gold)` : 'Confirm changes') : 'No changes'),
+        dirty ? h('button', { type: 'button', class: 'btn ghost', onclick: () => rerender([...(p.policies || [])], null) }, 'Undo changes') : null,
+        h('span', { class: 'small muted' }, `${Math.floor(p.gold)} gold`)),
+      h('div', { class: 'row-between' }, h('h3', {}, 'Policy cards'), tabs),
+      cardEls.length ? h('div', { class: 'policy-grid' }, ...cardEls) : h('p', { class: 'small muted' }, 'Research civics to unlock policy cards.')) : null,
+    h('section', { class: 'stack' },
+      h('h3', {}, 'Governments'),
+      h('div', { class: 'gov-grid' }, ...govCards)));
+  app.openModal(content, { wide: true, label: 'Government' });
 }
 
 // ---------- diplomacy ----------
@@ -341,6 +482,9 @@ export function openMenu(app) {
   app.openModal(h('div', { class: 'stack menu' },
     h('h2', {}, 'Menu'),
     inGame ? h('button', { type: 'button', class: 'btn primary', onclick: () => app.closeModal() }, 'Resume') : null,
+    inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openTechTree(app) }, 'Tech tree') : null,
+    inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openCivicsTree(app) }, 'Civics tree') : null,
+    inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openGovernment(app) }, 'Government') : null,
     inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openSaves(app, 'save') }, 'Save game') : null,
     h('button', { type: 'button', class: 'btn', onclick: () => openSaves(app, 'load') }, 'Load game'),
     inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openTransfer(app) }, 'Export or import a save') : null,
@@ -488,7 +632,7 @@ export function openHelp(app) {
     ['Click a unit', 'Select it'], ['Click a highlighted tile', 'Move there, or attack a red tile'], ['Right-click', 'Move or attack with the selected unit'],
     ['Drag / WASD / arrows', 'Pan the map'], ['Scroll / + / −', 'Zoom'], ['Enter', 'End turn, or jump to what needs orders'], ['Shift+Enter', 'End turn anyway'],
     ['Space', 'Skip unit'], ['F', 'Fortify'], ['Z', 'Sleep'], ['B', 'Found city'], ['U', 'Upgrade unit'], ['Tab or .', 'Next unit'], ['C', 'Center on selection'],
-    ['T', 'Tech tree'], ['P', 'Diplomacy'], ['Y', 'Tile yields'], ['Esc', 'Cancel, deselect, then menu'], ['Delete', 'Disband unit'],
+    ['T', 'Tech tree'], ['V', 'Civics tree'], ['G', 'Government'], ['P', 'Diplomacy'], ['Y', 'Tile yields'], ['Esc', 'Cancel, deselect, then menu'], ['Delete', 'Disband unit'],
   ];
   app.openModal(h('div', { class: 'stack help' },
     h('h2', {}, 'How to play'),
@@ -498,6 +642,8 @@ export function openHelp(app) {
         h('p', {}, `Capture every rival's original capital for a domination victory, or be first to research Offworld Mission, the last tech of the Future Era, for a science victory. Otherwise the highest score when the turn limit ends wins. You lose if you lose all your cities.`),
         h('h3', {}, 'Technology'),
         h('p', {}, `${TECH_KEYS.length} techs across ${ERAS.length} eras unlock units, buildings, districts and lasting bonuses. Pick any tech in the tree and the techs it needs are researched first. When a better unit is unlocked, the old one can no longer be built; upgrade it for gold inside your borders.`),
+        h('h3', {}, 'Civics and government'),
+        h('p', {}, `Culture researches ${CIVIC_KEYS.length} civics, the second tree. Civics unlock governments and policy cards. A government has military, economic and wildcard slots; slot cards for bonuses. On any turn you finish a civic, changing government and cards is free. At other times each new card costs gold.`),
         h('h3', {}, 'Cities'),
         h('p', {}, `Settlers found cities at least ${RULES.cityMinDistance} tiles apart. Each citizen works one tile and eats 2 food. Culture grows your borders one tile at a time, and gold can buy tiles or finish production.`),
         h('h3', {}, 'Districts'),
@@ -535,11 +681,12 @@ export function showGameOver(app) {
   const allPlayers = [...s.players].sort((a, b) => (b.alive ? score(s, b.id) : -1) - (a.alive ? score(s, a.id) : -1));
   const me = scoreBreakdown(s, hid);
   const table = h('table', { class: 'score-table' },
-    h('thead', {}, h('tr', {}, h('th', {}, 'Civilization'), h('th', {}, 'Cities'), h('th', {}, 'Techs'), h('th', {}, 'Score'))),
+    h('thead', {}, h('tr', {}, h('th', {}, 'Civilization'), h('th', {}, 'Cities'), h('th', {}, 'Techs'), h('th', {}, 'Civics'), h('th', {}, 'Score'))),
     h('tbody', {}, ...allPlayers.map((p) => h('tr', { class: p.id === hid ? 'me' : '' },
       h('td', {}, h('span', { html: emblemSvg(p.emblem, p.color, 16) }), ` ${p.name}${p.alive ? '' : ' (eliminated)'}`),
       h('td', {}, String(citiesOf(s, p.id).length)),
       h('td', {}, String(p.techs.length)),
+      h('td', {}, String((p.civics || []).length)),
       h('td', {}, p.alive ? String(score(s, p.id)) : '–')))));
   const breakdown = h('table', { class: 'score-table small' },
     h('tbody', {}, ...me.map((r) => h('tr', {}, h('th', {}, r.label), h('td', {}, String(r.count)), h('td', {}, `${r.points} pts`)))));
