@@ -11,6 +11,7 @@ export function declareWar(state, a, b, events) {
   state.players[a].warSince[b] = state.turn;
   state.players[b].warSince[a] = state.turn;
   state.offers = state.offers.filter((o) => !(o.from === a && o.to === b) && !(o.from === b && o.to === a));
+  for (const pid of [a, b]) state.players[pid].stats.wars = (state.players[pid].stats.wars || 0) + 1;
   events.push({ type: 'war', a, b });
 }
 
@@ -48,6 +49,7 @@ export function makePeace(state, a, b, events) {
   state.offers = state.offers.filter((o) => !(o.from === a && o.to === b) && !(o.from === b && o.to === a));
   expel(state, a, b);
   expel(state, b, a);
+  for (const pid of [a, b]) state.players[pid].stats.peace = (state.players[pid].stats.peace || 0) + 1;
   events.push({ type: 'peace', a, b });
 }
 

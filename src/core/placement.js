@@ -4,6 +4,7 @@ import { neighbors, within, distance } from './hex.js';
 import { DISTRICTS } from '../data/districts.js';
 import { RULES } from '../data/rules.js';
 import { cityAt, unitsAt } from './query.js';
+import { effects } from './effects.js';
 
 function surroundings(state, i) {
   const map = state.map;
@@ -21,9 +22,11 @@ function surroundings(state, i) {
   return s;
 }
 
-export function adjacencyBonus(state, i, key) {
+export function adjacencyBonus(state, i, key, owner = state.map.tiles[i].owner) {
   const s = surroundings(state, i);
-  const shared = Math.floor(s.districts / 2);
+  // Neighboring districts give +1 per two, or +1 each with Japan's Meiji Restoration.
+  const full = owner >= 0 && effects(state, owner).fullAdjacency;
+  const shared = full ? s.districts : Math.floor(s.districts / 2);
   switch (key) {
     case 'campus':
       return s.mountains + shared;
@@ -41,8 +44,9 @@ export function adjacencyBonus(state, i, key) {
 }
 
 // Plain-language reasons behind a tile's bonus, for tooltips.
-export function adjacencyReasons(state, i, key) {
+export function adjacencyReasons(state, i, key, owner = state.map.tiles[i].owner) {
   const s = surroundings(state, i);
+  const full = owner >= 0 && effects(state, owner).fullAdjacency;
   const out = [];
   const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
   if (key === 'campus' && s.mountains) out.push(`+${s.mountains} from ${plural(s.mountains, 'mountain')}`);
@@ -50,7 +54,7 @@ export function adjacencyReasons(state, i, key) {
   if (key === 'industrial' && s.mines) out.push(`+${s.mines} from ${plural(s.mines, 'mine')}`);
   if (key === 'harbor' && s.center) out.push('+2 next to the city center');
   if (key === 'harbor' && s.fish) out.push(`+${s.fish} from Fish`);
-  if (key !== 'encampment' && s.districts >= 2) out.push(`+${Math.floor(s.districts / 2)} from ${s.districts} neighboring districts`);
+  if (key !== 'encampment' && (full ? s.districts >= 1 : s.districts >= 2)) out.push(`+${full ? s.districts : Math.floor(s.districts / 2)} from ${s.districts} neighboring district${s.districts > 1 ? 's' : ''}`);
   return out;
 }
 

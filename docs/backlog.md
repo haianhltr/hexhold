@@ -2,6 +2,12 @@
 
 **Hexhold** is a working title. Rename it any time.
 
+## Update (v1.4.0, 2026-09-26)
+
+Twelve real civilizations with leaders, abilities, unique units and unique infrastructure ([civilizations-dictionary.md](civilizations-dictionary.md)). Eurekas and Inspirations for almost every tech and civic, a tourism-based culture victory, and a history of historic moments with a History screen ([victory-and-history.md](victory-and-history.md)). The details are in CHANGELOG.md.
+
+Eurekas speed up research, so tree costs from the Classical era on went up again. On Normal, the leading AI is in the Renaissance or Industrial era at turn 100, and Epic games end in a science victory between turns 180 and 245. Culture victories are rarer and come from runaway leaders; they're a deliberate path for players.
+
 ## Update (v1.3.0, 2026-09-26)
 
 Civics, governments and policy cards, modeled on Civilization VI with Gathering Storm. The reference is [civics-dictionary.md](civics-dictionary.md). It has 59 civics researched with culture, 13 governments and 57 policy cards, plus a government screen and AI that uses all of them. The details are in CHANGELOG.md.

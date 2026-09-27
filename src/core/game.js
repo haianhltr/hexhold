@@ -3,6 +3,7 @@
 
 import { startPlayerTurn, endRound } from './turn.js';
 import { checkVictory } from './victory.js';
+import { recordHistory } from './history.js';
 
 export function finishHumanTurn(state, runAI) {
   const events = [];
@@ -15,6 +16,7 @@ export function finishHumanTurn(state, runAI) {
   const human = state.players.find((p) => p.human);
   if (human && human.alive && state.phase !== 'ended') startPlayerTurn(state, human.id, events);
   checkVictory(state, events);
+  recordHistory(state, events);
   return events;
 }
 
@@ -27,5 +29,6 @@ export function playAIRound(state, runAI) {
     runAI(state, p.id, events);
   }
   if (state.phase !== 'ended') endRound(state, events);
+  recordHistory(state, events);
   return events;
 }

@@ -5,21 +5,23 @@ import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { TERRAIN, IMPROVEMENTS, RESOURCES, improvementValid } from '../data/terrain.js';
 import { maxMoves, effects } from '../core/effects.js';
+import { districtNameFor } from '../data/civs.js';
 import { TECHS, eraOf } from '../data/techs.js';
 import { RULES } from '../data/rules.js';
 import { cityAt, unitsAt, owningCity, hasTech, atWar, yearLabel } from '../core/query.js';
 import { playerYields, cityYields, tileYield } from '../core/yields.js';
-import { foundReason, cityGrowthThreshold, borderThreshold, buildOptions, turnsLeft, buyCost, itemName, itemCost, cityMaxHp, borderCandidates, buyTileCost, cityHasStrike, upgradeTarget, upgradeCost } from '../core/city.js';
+import { improvementReason, foundReason, cityGrowthThreshold, borderThreshold, buildOptions, turnsLeft, buyCost, itemName, itemCost, cityMaxHp, borderCandidates, buyTileCost, cityHasStrike, upgradeTarget, upgradeCost } from '../core/city.js';
 import { adjacencyBonus, adjacencyReasons, districtLimit } from '../core/placement.js';
 import { studyCost, studyName, turnsToStudy } from '../core/research.js';
 import { availablePolicies, availableGovernments } from '../core/civics.js';
-import { POLICIES, slotsOf, fitsSlot } from '../data/government.js';
+import { tourismOf } from '../core/tourism.js';
+import { POLICIES, slotsFor, fitsSlot } from '../data/government.js';
 import { moveCost, passable } from '../core/pathfind.js';
 import { attackInfo, cityCanStrike, cityDefense, defenseOf } from '../core/combat.js';
 import { visibleTiles } from '../core/vision.js';
 import { within } from '../core/hex.js';
 import { h, clear, fill, icon, emblemSvg, yieldChip, bar, fmt, signed, YIELD_COLORS } from './dom.js';
-import { openTechTree, openCivicsTree, openGovernment, openDiplomacy, openMenu, openHelp } from './screens.js';
+import { openTechTree, openCivicsTree, openGovernment, openDiplomacy, openMenu, openHelp, openHistory } from './screens.js';
 
 // ---------- top bar ----------
 
@@ -45,11 +47,13 @@ export function renderTopBar(app) {
         bar(have / cost, YIELD_COLORS[yieldKey], tech ? 'Research progress' : 'Civic progress')));
   };
   const hasCities = y.science > 0;
+  const tourism = tourismOf(s, p.id);
   fill(app.topbar, 
     h('div', { class: 'tb-civ', title: `You lead ${p.name}` }, h('span', { html: emblemSvg(p.emblem, p.color, 20) }), h('b', {}, p.name)),
     h('div', { class: 'tb-yields' },
       yieldChip('science', y.science, { signed: true, title: 'Science per turn' }),
       yieldChip('culture', y.culture, { signed: true, title: 'Culture per turn' }),
+      tourism > 0 ? h('span', { class: 'yield y-tourism', title: 'Tourism per turn. It draws visitors from other civilizations toward a culture victory (R).' }, h('span', { html: icon('tourism') }), h('b', {}, signed(tourism))) : null,
       h('span', { class: 'yield y-gold', title: `Gold ${Math.floor(p.gold)}. ${signed(y.goldNet)} per turn after ${y.upkeep} gold of unit upkeep.` },
         h('span', { html: icon('gold') }), h('b', {}, String(Math.floor(p.gold))), hasCities ? h('small', {}, `${signed(y.goldNet)}`) : null)),
     h('div', { class: 'tb-progress' }, progressEl('tech'), progressEl('civic')),
@@ -57,6 +61,7 @@ export function renderTopBar(app) {
     h('nav', { class: 'tb-actions', 'aria-label': 'Game menus' },
       h('button', { type: 'button', class: `btn ghost${govNeedsAttention(p) ? ' attention' : ''}`, onclick: () => openGovernment(app), title: 'Government and policies (G)' }, 'Government'),
       h('button', { type: 'button', class: 'btn ghost', onclick: () => openDiplomacy(app), title: 'Diplomacy (P)' }, 'Diplomacy'),
+      h('button', { type: 'button', class: 'btn ghost', onclick: () => openHistory(app), title: 'History and victory progress (R)' }, 'History'),
       h('button', { type: 'button', class: 'btn ghost', onclick: () => openHelp(app), title: 'How to play (H)' }, 'Help'),
       h('button', { type: 'button', class: 'btn ghost icon-btn', onclick: () => openMenu(app), title: 'Menu (Esc)', 'aria-label': 'Menu', html: icon('menu') })),
   );
@@ -66,21 +71,12 @@ export function renderTopBar(app) {
 export function govNeedsAttention(p) {
   const avail = availablePolicies(p);
   if (!p.government) return availableGovernments(p).length > 0;
-  return slotsOf(p.government).some((kind, i) => !p.policies[i] && avail.some((k) => fitsSlot(POLICIES[k].slot, kind) && !p.policies.includes(k)));
+  return slotsFor(p).some((kind, i) => !p.policies[i] && avail.some((k) => fitsSlot(POLICIES[k].slot, kind) && !p.policies.includes(k)));
 }
 
 // ---------- unit panel ----------
 
-function improveReason(s, u, kind) {
-  const tile = s.map.tiles[u.tile];
-  const imp = IMPROVEMENTS[kind];
-  if (tile.owner !== u.owner) return 'Only inside your borders';
-  if (tile.district || cityAt(s, u.tile)) return "Cities and districts can't be improved";
-  if (!hasTech(s, u.owner, imp.tech)) return `Needs ${TECHS[imp.tech].name}`;
-  if (!improvementValid(tile, kind)) return imp.hint;
-  if (tile.imp === kind) return 'Already built here';
-  return null;
-}
+const improveReason = (s, u, kind) => improvementReason(s, u.owner, u.tile, kind);
 
 export function renderUnitPanel(app) {
   const panel = app.unitPanel;
@@ -99,6 +95,8 @@ export function renderUnitPanel(app) {
     add('Build farm', null, () => app.unitCommand('improve', { kind: 'farm' }), u.moves <= 0 ? 'No moves left this turn' : improveReason(s, u, 'farm'));
     add('Build mine', null, () => app.unitCommand('improve', { kind: 'mine' }), u.moves <= 0 ? 'No moves left this turn' : improveReason(s, u, 'mine'));
     if (hasTech(s, u.owner, IMPROVEMENTS.lumbermill.tech)) add('Build lumber mill', null, () => app.unitCommand('improve', { kind: 'lumbermill' }), u.moves <= 0 ? 'No moves left this turn' : improveReason(s, u, 'lumbermill'));
+    // This civilization's unique improvement, if it has one.
+    for (const [k, d] of Object.entries(IMPROVEMENTS)) if (d.civ && d.civ === p.civ) add(`Build ${d.name}`, null, () => app.unitCommand('improve', { kind: k }), u.moves <= 0 ? 'No moves left this turn' : improveReason(s, u, k), 'unique');
   }
   const upTo = upgradeTarget(s, u);
   if (upTo) {
@@ -230,7 +228,7 @@ export function renderCityPanel(app) {
   }
 
   const built = c.buildings.length || c.districts.length ? h('div', { class: 'cp-built' },
-    ...c.districts.map((t) => { const k = s.map.tiles[t].district; const ty = tileYield(s, t); const val = DISTRICTS[k].yield ? ` +${fmt(ty[DISTRICTS[k].yield])}` : ''; return h('span', { class: 'chip district', title: DISTRICTS[k].info }, `${DISTRICTS[k].name}${val}`); }),
+    ...c.districts.map((t) => { const k = s.map.tiles[t].district; const ty = tileYield(s, t); const val = DISTRICTS[k].yield ? ` +${fmt(ty[DISTRICTS[k].yield])}` : ''; return h('span', { class: 'chip district', title: DISTRICTS[k].info }, `${districtNameFor(s.players[c.owner].civ, k, DISTRICTS[k].name)}${val}`); }),
     ...c.buildings.map((b) => h('span', { class: 'chip', title: BUILDINGS[b].info }, BUILDINGS[b].name))) : null;
 
   fill(panel, head, h('div', { class: 'cp-scroll' },
@@ -327,6 +325,7 @@ export function renderNotes(app) {
       if (n.open === 'tech') openTechTree(app);
       else if (n.open === 'civic') openCivicsTree(app);
       else if (n.open === 'government') openGovernment(app);
+      else if (n.open === 'history') openHistory(app);
       else if (n.open === 'diplomacy') openDiplomacy(app);
       else if (n.city != null && app.state.cities[n.city]?.owner === app.humanId) app.selectCity(app.state.cities[n.city], { center: true });
       else if (n.tile != null) app.renderer.centerOn(n.tile);
@@ -365,7 +364,7 @@ export function tileTooltip(app, i) {
     lines.push(h('div', { class: 'small muted' }, `Strength ${dfn.total} · ${Math.round(city.hp)}/${cityMaxHp(s, city)} HP${cityHasStrike(city) ? ' · walls' : ''}`));
   } else if (t.district) {
     const reasons = adjacencyReasons(s, i, t.district);
-    lines.push(h('div', {}, `${DISTRICTS[t.district].name} district`));
+    lines.push(h('div', {}, `${districtNameFor(s.players[t.owner]?.civ, t.district, DISTRICTS[t.district].name)} district`));
     lines.push(yieldRow(tileYield(s, i, hid)));
     if (reasons.length) lines.push(h('div', { class: 'small muted' }, reasons.join('. ')));
   } else {

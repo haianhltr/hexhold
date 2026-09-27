@@ -4,11 +4,12 @@ import { RULES } from '../data/rules.js';
 import { UNITS, isMilitary } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS, ENCAMPMENT_PRODUCTION_BONUS } from '../data/districts.js';
-import { CIVS } from '../data/civs.js';
+import { CIVS, districtNameFor } from '../data/civs.js';
 import { TECHS } from '../data/techs.js';
 import { CIVICS } from '../data/civics.js';
 import { within, distance, neighbors } from './hex.js';
-import { touch, citiesOf, unitsAt, spawnUnit, hasTech, hasCivic, hasUnlock, removeUnit } from './query.js';
+import { touch, citiesOf, unitsAt, spawnUnit, hasTech, hasCivic, hasUnlock, removeUnit, cityAt } from './query.js';
+import { IMPROVEMENTS, improvementValid } from '../data/terrain.js';
 import { tileYield, cityYields } from './yields.js';
 import { validDistrictTiles, districtLimit, districtsUsed, hasDistrict, adjacencyBonus } from './placement.js';
 import { canEnter, passable } from './pathfind.js';
@@ -87,6 +88,10 @@ export function foundCity(state, pid, i, events) {
   }
   assignWorkers(state, city);
   for (const c of touched) assignWorkers(state, c);
+  for (const b of effects(state, pid).freeBuildings) {
+    const key = buildingFor(state, pid, b);
+    if (!city.buildings.includes(key)) city.buildings.push(key);
+  }
   events.push({ type: 'cityFounded', city: city.id, owner: pid, tile: i });
   return city;
 }
@@ -187,6 +192,46 @@ export function cityMaxHp(state, city) {
 
 export const cityHasStrike = (city) => city.buildings.some((b) => BUILDINGS[b].defense?.strike);
 
+// ---------- unique units and buildings ----------
+
+// A civilization's own version of a standard unit or building (its unique replacement), or the
+// key itself.
+export function unitFor(state, pid, key) {
+  const civ = state.players[pid]?.civ;
+  for (const k in UNITS) if (UNITS[k].civ === civ && UNITS[k].replaces === key) return k;
+  return key;
+}
+export function buildingFor(state, pid, key) {
+  const civ = state.players[pid]?.civ;
+  for (const k in BUILDINGS) if (BUILDINGS[k].civ === civ && BUILDINGS[k].replaces === key) return k;
+  return key;
+}
+
+// Why this civilization can't use a unit or building at all (another civ's unique, or a standard
+// one its own unique replaces), or null.
+function civReason(state, pid, table, key) {
+  const def = table[key];
+  const civ = state.players[pid]?.civ;
+  if (def.civ) return def.civ === civ ? null : `Only ${CIVS[def.civ].name} can build the ${def.name}`;
+  const mine = Object.values(table).find((d) => d.civ === civ && d.replaces === key);
+  return mine ? `Replaced by your ${mine.name}` : null;
+}
+
+// Why player `pid` can't build improvement `kind` on tile `i`, or null if they can.
+export function improvementReason(state, pid, i, kind) {
+  const tile = state.map.tiles[i];
+  const imp = IMPROVEMENTS[kind];
+  if (!imp) return 'Unknown improvement';
+  if (imp.civ && imp.civ !== state.players[pid].civ) return `Only ${CIVS[imp.civ].name} can build a ${imp.name}`;
+  if (tile.owner !== pid) return 'Only inside your borders';
+  if (tile.district || cityAt(state, i)) return "Cities and districts can't be improved";
+  if (!hasTech(state, pid, imp.tech)) return `Needs ${TECHS[imp.tech].name}`;
+  if (!hasCivic(state, pid, imp.civic)) return `Needs ${CIVICS[imp.civic].name}`;
+  if (!improvementValid(tile, kind)) return imp.hint;
+  if (tile.imp === kind) return 'Already built here';
+  return null;
+}
+
 // ---------- unit lines ----------
 
 // A unit type can't be built once its owner knows the tech for the next unit in its line.
@@ -198,10 +243,10 @@ export function isObsoleteUnit(state, pid, type) {
 // The best unit this unit can upgrade to right now (skipping steps already researched), or null.
 export function upgradeTarget(state, unit) {
   let target = null;
-  let next = UNITS[unit.type].upgradesTo;
+  let next = UNITS[unit.type].upgradesTo && unitFor(state, unit.owner, UNITS[unit.type].upgradesTo);
   while (next && hasTech(state, unit.owner, UNITS[next].tech)) {
     target = next;
-    next = UNITS[next].upgradesTo;
+    next = UNITS[next].upgradesTo && unitFor(state, unit.owner, UNITS[next].upgradesTo);
   }
   return target;
 }
@@ -228,7 +273,11 @@ export function buildReason(state, city, item, inQueue = false) {
   if (!hasTech(state, city.owner, def.tech)) return `Needs ${TECHS[def.tech].name}`;
   if (!hasCivic(state, city.owner, def.civic)) return `Needs ${CIVICS[def.civic].name}`;
   const queued = !inQueue && city.queue.some((q) => sameItem(q, item));
-  if (item.kind === 'unit' && isObsoleteUnit(state, city.owner, item.key)) return `Replaced by ${UNITS[UNITS[item.key].upgradesTo].name}`;
+  if (item.kind !== 'district') {
+    const why = civReason(state, city.owner, item.kind === 'unit' ? UNITS : BUILDINGS, item.key);
+    if (why) return why;
+  }
+  if (item.kind === 'unit' && isObsoleteUnit(state, city.owner, item.key)) return `Replaced by ${UNITS[unitFor(state, city.owner, UNITS[item.key].upgradesTo)].name}`;
   if (item.kind === 'building') {
     if (city.buildings.includes(item.key)) return 'Already built';
     if (queued) return 'Already in the queue';
@@ -252,8 +301,10 @@ export function buildOptions(state, city) {
   const out = [];
   const add = (kind, key, def) => {
     if (!hasUnlock(state, city.owner, def)) return;
+    if (kind !== 'district' && civReason(state, city.owner, kind === 'unit' ? UNITS : BUILDINGS, key)) return;
     const item = { kind, key };
-    out.push({ ...item, name: def.name, cost: def.cost, info: def.info, reason: buildReason(state, city, item) });
+    const name = kind === 'district' ? districtNameFor(state.players[city.owner].civ, key, def.name) : def.name;
+    out.push({ ...item, name, cost: def.cost, info: def.info, reason: buildReason(state, city, item) });
   };
   for (const key in DISTRICTS) add('district', key, DISTRICTS[key]);
   for (const key in BUILDINGS) add('building', key, BUILDINGS[key]);
@@ -324,6 +375,8 @@ export function completeItem(state, city, item, events) {
     if (tile < 0) return false;
     const unit = spawnUnit(state, city.owner, item.key, tile);
     unit.moves = 0;
+    const stats = state.players[city.owner].stats;
+    stats.built = { ...(stats.built || {}), [item.key]: ((stats.built || {})[item.key] || 0) + 1 };
     if (isMilitary(item.key)) unit.bonus = city.buildings.reduce((s, b) => s + (BUILDINGS[b].unitBonus || 0), 0);
     if (item.key === 'settler') {
       city.pop--;

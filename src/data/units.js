@@ -52,5 +52,24 @@ export const UNITS = {
   rocketartillery: u('Rocket Artillery', 'ranged', 70, 2, 250, { ranged: 85, range: 3, vsCity: 10, tech: 'guidance', tags: ['siege'], glyph: 'cannon', model: 'tank', info: 'Range 3. +10 strength against cities.' }),
 };
 
+// Unique units (see data/civs.js). Each replaces a standard unit for one civilization and keeps its
+// tech, upgrade line, class and look unless overridden. `defenseBonus` adds strength when
+// defending; `noWoundPenalty` keeps full strength when wounded.
+const uu = (base, civ, name, over, info) => ({ ...UNITS[base], name, civ, replaces: base, ...over, info });
+Object.assign(UNITS, {
+  legion: uu('swordsman', 'rome', 'Legion', { strength: 40, cost: 65 }, 'Roman heavy infantry.'),
+  maryannu: uu('archer', 'egypt', 'Maryannu Chariot Archer', { strength: 18, ranged: 28, moves: 4, cost: 45, tags: ['mounted'] }, 'Fast chariot archers.'),
+  hoplite: uu('spearman', 'greece', 'Hoplite', { strength: 30, cost: 35 }, 'Greek citizen spearmen. +10 against mounted units.'),
+  immortal: uu('swordsman', 'persia', 'Immortal', { strength: 36, defenseBonus: 5, cost: 60 }, 'The Persian royal guard. +5 strength when defending.'),
+  chukonu: uu('crossbowman', 'china', 'Chu-Ko-Nu', { ranged: 45, cost: 85 }, 'Repeating crossbows.'),
+  varu: uu('knight', 'india', 'Varu', { strength: 54, moves: 3, cost: 90 }, 'War elephants: slower than the Knight, but stronger.'),
+  samurai: uu('manatarms', 'japan', 'Samurai', { strength: 48, noWoundPenalty: true }, 'Fights at full strength even when wounded.'),
+  hwacha: uu('fieldcannon', 'korea', 'Hwacha', { strength: 45, ranged: 67, cost: 140 }, 'Korean rocket carts.'),
+  keshig: uu('crossbowman', 'mongolia', 'Keshig', { strength: 30, ranged: 40, moves: 4, tags: ['mounted'], glyph: 'horseman', model: 'riders' }, 'Mounted archers of the imperial guard.'),
+  redcoat: uu('lineinfantry', 'england', 'Redcoat', { strength: 69 }, 'Disciplined line infantry.'),
+  garde: uu('lineinfantry', 'france', 'Garde Impériale', { strength: 67, defenseBonus: 5 }, 'The imperial guard. +5 strength when defending.'),
+  eagle: uu('warrior', 'aztec', 'Eagle Warrior', { strength: 28, cost: 25 }, 'Elite Aztec warriors.'),
+});
+
 export const isMilitary = (type) => UNITS[type].cls !== 'civilian';
 export const hasTag = (type, tag) => !!UNITS[type].tags?.includes(tag);

@@ -16,7 +16,7 @@
 //   nextId, war: ['a-b'], met: ['a-b'], offers: [{ from, to, turn }], hints: {}
 
 import { generateMap } from './mapgen.js';
-import { CIVS } from '../data/civs.js';
+import { CIVS, CIV_KEYS, LEGACY_CIVS } from '../data/civs.js';
 import { RULES, DIFFICULTY, MAP_SIZES } from '../data/rules.js';
 import { makeRng, randomSeed } from './rng.js';
 import { neighbors } from './hex.js';
@@ -25,10 +25,13 @@ import { canEnter } from './pathfind.js';
 import { startPlayerTurn } from './turn.js';
 import { refreshVision } from './vision.js';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 // Fields every player starts with for civics and government.
 export const civicFields = () => ({ civic: null, civicPath: [], civics: [], civicProgress: {}, cultureOverflow: 0, futureCivics: 0, government: null, policies: [], freeChanges: false });
+
+// Fields added in version 4: research boosts, culture victory progress and firsts for history.
+export const historyFields = () => ({ eurekas: [], inspirations: [], cultureTotal: 0, tourismTo: {}, firsts: [] });
 
 function freeNeighbor(state, owner, type, tile) {
   const probe = { owner, type, id: -1 };
@@ -41,13 +44,19 @@ export function createGame(opts = {}) {
   const rivals = Math.max(1, Math.min(3, opts.rivals ?? 2));
   const difficulty = DIFFICULTY[opts.difficulty] ? opts.difficulty : 'normal';
   const allAI = !!opts.allAI;
-  const humanCiv = CIVS[opts.civ] ? opts.civ : 0;
+  const humanCiv = CIVS[opts.civ] ? opts.civ : CIV_KEYS[0];
   const count = rivals + 1;
   const { w, h } = MAP_SIZES[size];
   const { map, starts } = generateMap(seed, w, h, count);
   const rng = makeRng(seed ^ 0x5bd1e995);
 
-  const civOrder = [humanCiv, ...CIVS.map((_, i) => i).filter((i) => i !== humanCiv)];
+  // Rivals are drawn at random from every other civilization.
+  const others = CIV_KEYS.filter((k) => k !== humanCiv);
+  for (let i = others.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [others[i], others[j]] = [others[j], others[i]];
+  }
+  const civOrder = [humanCiv, ...others];
   const startOrder = [...starts];
   for (let i = startOrder.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -74,6 +83,8 @@ export function createGame(opts = {}) {
     met: [],
     offers: [],
     hints: {},
+    history: [],
+    firsts: [],
   };
 
   for (let i = 0; i < count; i++) {
@@ -83,6 +94,7 @@ export function createGame(opts = {}) {
       id: i,
       civ,
       name: CIVS[civ].name,
+      leader: CIVS[civ].leader,
       color: CIVS[civ].color,
       emblem: CIVS[civ].emblem,
       human,
@@ -95,12 +107,13 @@ export function createGame(opts = {}) {
       sciOverflow: 0,
       future: 0,
       ...civicFields(),
+      ...historyFields(),
       capital: null,
       origCapital: null,
       nameIdx: 0,
-      personality: human ? null : rng() < 0.5 ? 'builder' : 'conqueror',
+      personality: human ? null : CIVS[civ].personality,
       explored: new Array(map.tiles.length).fill(0),
-      stats: { kills: 0, lost: 0, citiesCaptured: 0 },
+      stats: { kills: 0, lost: 0, citiesCaptured: 0, built: {}, upgrades: 0, wars: 0, peace: 0 },
       warSince: {},
       peaceSince: {},
       ai: {},
@@ -152,6 +165,21 @@ const MIGRATIONS = {
   2(s) {
     for (const p of s.players) Object.assign(p, { ...civicFields(), ...p });
     s.version = 3;
+    return s;
+  },
+  // 1.3 → 1.4: real civilizations, boosts, tourism and history. The four original civilizations
+  // become Rome, Greece, the Aztec and Persia (city names already founded stay).
+  3(s) {
+    for (const p of s.players) {
+      const key = typeof p.civ === 'number' ? LEGACY_CIVS[p.civ] || CIV_KEYS[0] : p.civ;
+      const def = CIVS[key];
+      Object.assign(p, { ...historyFields(), ...p, civ: key, name: def.name, leader: def.leader, color: def.color, emblem: def.emblem });
+      p.stats = { built: {}, upgrades: 0, wars: 0, peace: 0, ...p.stats };
+      p.nameIdx = Math.max(p.nameIdx, 0);
+    }
+    s.history = s.history || [];
+    s.firsts = s.firsts || [];
+    s.version = 4;
     return s;
   },
 };

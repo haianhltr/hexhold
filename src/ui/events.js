@@ -6,27 +6,40 @@ import { DISTRICTS } from '../data/districts.js';
 import { IMPROVEMENTS } from '../data/terrain.js';
 import { TECHS, TECH_KEYS } from '../data/techs.js';
 import { CIVICS } from '../data/civics.js';
+import { districtNameFor } from '../data/civs.js';
 import { GOVERNMENTS, POLICIES } from '../data/government.js';
 import { itemName } from '../core/city.js';
 import { techName, canResearchNow } from '../core/research.js';
 import { civicName } from '../core/civics.js';
+import { boostGoal, goalText, boostShare } from '../core/boosts.js';
+import { cultureStatus } from '../core/tourism.js';
 import { haveMet } from '../core/query.js';
 
-export function unlocksOf(tech) {
+// Whether a unit, building or improvement belongs in `civ`'s lists: not another civilization's
+// unique item, and not a standard one that `civ` replaces with its own. With no civ, everything
+// standard counts.
+function ownsItem(table, key, civ) {
+  const d = table[key];
+  if (d.civ) return d.civ === civ;
+  return !civ || !Object.values(table).some((x) => x.civ === civ && x.replaces === key);
+}
+
+export function unlocksOf(tech, civ = null) {
   const out = [];
-  for (const [k, d] of Object.entries(DISTRICTS)) if (d.tech === tech) out.push({ kind: 'district', key: k, name: d.name });
-  for (const [k, d] of Object.entries(BUILDINGS)) if (d.tech === tech) out.push({ kind: 'building', key: k, name: d.name });
-  for (const [k, d] of Object.entries(UNITS)) if (d.tech === tech) out.push({ kind: 'unit', key: k, name: d.name });
-  for (const [k, d] of Object.entries(IMPROVEMENTS)) if (d.tech === tech) out.push({ kind: 'improvement', key: k, name: d.name });
+  for (const [k, d] of Object.entries(DISTRICTS)) if (d.tech === tech) out.push({ kind: 'district', key: k, name: districtNameFor(civ, k, d.name) });
+  for (const [k, d] of Object.entries(BUILDINGS)) if (d.tech === tech && ownsItem(BUILDINGS, k, civ)) out.push({ kind: 'building', key: k, name: d.name });
+  for (const [k, d] of Object.entries(UNITS)) if (d.tech === tech && ownsItem(UNITS, k, civ)) out.push({ kind: 'unit', key: k, name: d.name });
+  for (const [k, d] of Object.entries(IMPROVEMENTS)) if (d.tech === tech && ownsItem(IMPROVEMENTS, k, civ)) out.push({ kind: 'improvement', key: k, name: d.name });
   if (TECHS[tech]?.effectText) out.push({ kind: 'effect', name: TECHS[tech].effectText });
   return out;
 }
 
-export function civicUnlocksOf(civic) {
+export function civicUnlocksOf(civic, civ = null) {
   const out = [];
   for (const [k, g] of Object.entries(GOVERNMENTS)) if (g.civic === civic) out.push({ kind: 'government', key: k, name: g.name });
-  for (const [k, d] of Object.entries(DISTRICTS)) if (d.civic === civic) out.push({ kind: 'district', key: k, name: d.name });
-  for (const [k, d] of Object.entries(BUILDINGS)) if (d.civic === civic) out.push({ kind: 'building', key: k, name: d.name });
+  for (const [k, d] of Object.entries(DISTRICTS)) if (d.civic === civic) out.push({ kind: 'district', key: k, name: districtNameFor(civ, k, d.name) });
+  for (const [k, d] of Object.entries(BUILDINGS)) if (d.civic === civic && ownsItem(BUILDINGS, k, civ)) out.push({ kind: 'building', key: k, name: d.name });
+  for (const [k, d] of Object.entries(IMPROVEMENTS)) if (d.civic === civic && ownsItem(IMPROVEMENTS, k, civ)) out.push({ kind: 'improvement', key: k, name: d.name });
   for (const [k, c] of Object.entries(POLICIES)) if (c.civic === civic) out.push({ kind: `policy ${c.slot}`, key: k, name: c.name });
   if (CIVICS[civic]?.effectText) out.push({ kind: 'effect', name: CIVICS[civic].effectText });
   return out;
@@ -46,13 +59,27 @@ export function describeEvent(s, e, hid) {
         }
         return null;
       }
-      const unlocked = unlocksOf(e.tech).map((u) => u.name);
+      const unlocked = unlocksOf(e.tech, s.players[hid].civ).map((u) => u.name);
       return { kind: 'good', icon: 'science', text: `Researched ${techName(e.tech)}.${unlocked.length ? ` Unlocks ${unlocked.join(', ')}.` : ''}`, open: 'tech' };
     }
     case 'civic': {
       if (e.player !== hid) return null;
-      const unlocked = civicUnlocksOf(e.civic).map((u) => u.name);
+      const unlocked = civicUnlocksOf(e.civic, s.players[hid].civ).map((u) => u.name);
       return { kind: 'good', icon: 'culture', text: `Completed ${civicName(e.civic)}.${unlocked.length ? ` Unlocks ${unlocked.join(', ')}.` : ''}${e.civic === 'futurecivic' ? '' : ' Policy changes are free this turn.'}`, open: 'government' };
+    }
+    case 'boost': {
+      if (e.player !== hid) return null;
+      const tech = e.track === 'tech';
+      const name = tech ? techName(e.key) : civicName(e.key);
+      return { kind: 'good', icon: tech ? 'science' : 'culture', text: `${tech ? 'Eureka' : 'Inspiration'}! ${goalText(boostGoal(e.track, e.key))}: +${boostShare(s, hid)}% toward ${name}.`, open: tech ? 'tech' : 'civic' };
+    }
+    case 'dominant': {
+      if (e.player === hid) return { kind: 'good', icon: 'culture', text: `Your culture now dominates ${P(e.over)}: your visitors from them outnumber their tourists at home.`, open: 'history' };
+      const status = cultureStatus(s, e.player);
+      const left = status.filter((x) => !x.dominant).length;
+      if (e.over === hid) return { kind: 'bad', icon: 'culture', text: `${P(e.player)}'s culture now dominates yours.${left <= 1 ? ' One more and they win a culture victory.' : ''}`, open: 'history' };
+      if (left === 1 && haveMet(s, hid, e.player)) return { kind: 'bad', icon: 'culture', text: `${P(e.player)}'s culture dominates all but one civilization. They are close to a culture victory.`, open: 'history' };
+      return null;
     }
     case 'government':
       if (e.player === hid || !haveMet(s, hid, e.player)) return null;
@@ -109,6 +136,7 @@ export function eventSound(e, hid, rivalsTurn) {
   switch (e.type) {
     case 'tech':
     case 'civic':
+    case 'boost':
       return e.player === hid ? 'tech' : null;
     case 'built':
       return e.owner === hid && rivalsTurn ? 'built' : null;

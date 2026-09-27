@@ -32,14 +32,16 @@ export const RULES = {
   sciencePerPop: 0.6,
   culturePerCity: 1,
   districtBase: 1,
-  futureTechCost: 1600,
+  futureTechCost: 2000,
   futureCivicCost: 800,
+  boostPct: 40, // a Eureka or Inspiration gives this share of the tech or civic's cost
+  tourism: { startCivic: 'humanism', fromCulture: 0.2, perTheaterBuilding: 1, domesticPer: 100, visitorPer: 200 }, // culture victory: see core/tourism.js
   policySwapBase: 20, // gold per newly slotted policy card outside a free-change turn...
   policySwapPerCivic: 3, // ...plus this much per civic researched
   governmentCostMult: 3, // switching government outside a free-change turn costs this many card swaps
   yearStart: -4000,
   yearsPerTurn: 40,
-  score: { city: 5, pop: 1, tech: 2, civic: 2, district: 3, tilesPer: 10, future: 5 },
+  score: { city: 5, pop: 1, tech: 2, civic: 2, district: 3, tilesPer: 10, future: 5, moment: 1 },
   maxQueue: 5,
   idleProductionCap: 60,
   settlerMinPop: 2,

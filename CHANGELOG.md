@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.4.0 — 2026-09-26
+
+Real civilizations, Eurekas and Inspirations, a culture victory, and a history of every civilization. The design references are [docs/civilizations-dictionary.md](docs/civilizations-dictionary.md) and [docs/victory-and-history.md](docs/victory-and-history.md).
+
+- **12 real civilizations** replace the four invented ones: Rome, Egypt, Greece, Persia, China, India, Japan, Korea, Mongolia, England, France and the Aztec. Each has:
+  - a historical leader, its own color and emblem, and real city names
+  - an ability, for example Greece's extra wildcard policy slot, Japan's stronger district adjacency, or the Aztec Flower War that turns kills into culture
+  - a unique unit that replaces a standard one: the Legion, Hoplite, Samurai, Hwacha, Keshig, Redcoat and six more
+  - a unique building, district or improvement: the Hanlin Academy, Acropolis, Seowon, Royal Navy Dockyard, Sphinx, Château and others
+
+  The New game screen shows all three traits for the civilization you pick. Rivals are drawn at random from the rest, and the AI plays each civilization as a builder or a conqueror.
+- **Eurekas and Inspirations:** 72 techs and 57 civics have a goal, shown on their cards with progress. Meeting it gives 40% of the cost at once (55% for China).
+- **Culture victory:** tourism draws visitors from other civilizations. Win by drawing more visitors from every rival than it has tourists at home. Tourism comes from Theater Square buildings, and from all culture once you complete Humanism. Late techs, civics, policy cards and France multiply it. You're warned when a rival gets close.
+- **History:** a timeline of historic moments for every civilization, such as founding cities, entering new eras, world firsts, wars, peace, captures and cultural dominance. Moments add a Historic moments row to the score.
+- **History screen (R):** victory progress for science, culture, domination and score, plus the timeline for you or everyone you know. The game-over screen links to it.
+- **Top bar:** Tourism per turn appears once you have some, and there's a History button.
+- **Balance:** Eurekas speed up research, so tech and civic costs from the Classical era on are higher. On Normal, AI-vs-AI Epic games still end in a science victory between turns 180 and 245, or reach the turn limit.
+- **Saves:** 1.3 saves load. Their four original civilizations become Rome, Greece, the Aztec and Persia.
+- **Checks:** 61 unit tests (10 of them new). The browser check covers the civilization picker, the History screen and unique units. `node tools/docs.mjs` regenerates the civics and civilizations dictionaries from the game data.
+
 ## 1.3.0 — 2026-09-26
 
 The civics tree, governments and policy cards, modeled on Civilization VI with Gathering Storm. The design reference is [docs/civics-dictionary.md](docs/civics-dictionary.md).

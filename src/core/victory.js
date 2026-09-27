@@ -1,9 +1,11 @@
-// Score, elimination and the ways a game ends: domination, science (Offworld Mission), score at
-// the turn limit, and defeat.
+// Score, elimination and the ways a game ends: domination, science (Offworld Mission), culture
+// (core/tourism.js), score at the turn limit, and defeat.
 
 import { RULES } from '../data/rules.js';
 import { TECHS } from '../data/techs.js';
 import { citiesOf, removeUnit } from './query.js';
+import { hasCultureVictory } from './tourism.js';
+import { historyPoints } from './history.js';
 
 export function scoreBreakdown(state, pid) {
   const S = RULES.score;
@@ -24,6 +26,7 @@ export function scoreBreakdown(state, pid) {
     { label: 'Civics', count: (p.civics || []).length, points: (p.civics || []).length * S.civic },
     { label: 'Future techs and civics', count: p.future + (p.futureCivics || 0), points: (p.future + (p.futureCivics || 0)) * S.future },
     { label: 'Districts', count: districts, points: districts * S.district },
+    { label: 'Historic moments', count: historyPoints(state, pid), points: historyPoints(state, pid) * S.moment },
     { label: 'Territory', count: tiles, points: Math.floor(tiles / S.tilesPer) },
   ];
 }
@@ -77,6 +80,12 @@ export function checkVictory(state, events) {
   const launcher = alive.find((p) => p.techs.some((k) => TECHS[k]?.effect?.victory === 'science'));
   if (launcher) {
     endGame(state, 'science', launcher.id, events);
+    return;
+  }
+  // Culture victory: more visiting tourists from every rival than it has at home.
+  const cultural = alive.find((p) => hasCultureVictory(state, p.id));
+  if (cultural) {
+    endGame(state, 'culture', cultural.id, events);
     return;
   }
   const everyoneFounded = alive.every((p) => p.origCapital != null);

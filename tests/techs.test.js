@@ -118,16 +118,18 @@ test('Satellites reveal the whole map', () => {
 // ---------- units ----------
 
 test('a new tech replaces the old unit: it can no longer be built, and queued ones switch over', () => {
+  // Player 0 is Rome, whose Legion replaces the Swordsman.
   const s = world();
   const city = foundCity(s, 0, index(s.map, 6, 5), []);
   const p = s.players[0];
   assert.equal(buildReason(s, city, { kind: 'unit', key: 'warrior' }), null);
   city.queue.push({ kind: 'unit', key: 'warrior' });
   p.techs.push('mining', 'bronze', 'ironworking');
-  assert.match(buildReason(s, city, { kind: 'unit', key: 'warrior' }), /Replaced by Swordsman/);
+  assert.match(buildReason(s, city, { kind: 'unit', key: 'warrior' }), /Replaced by Legion/);
+  assert.match(buildReason(s, city, { kind: 'unit', key: 'swordsman' }), /Replaced by your Legion/);
   assert.ok(!buildOptions(s, city).some((o) => o.key === 'warrior' && o.kind === 'unit' && !city.queue.length));
   processCity(s, city, []);
-  assert.equal(city.queue[0].key, 'swordsman');
+  assert.equal(city.queue[0].key, 'legion');
 });
 
 test('units upgrade for gold inside your borders, skipping steps already researched', () => {

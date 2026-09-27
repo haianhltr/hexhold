@@ -6,7 +6,7 @@
 // more. Removing a card is always free. A player's first government is free.
 
 import { CIVICS } from '../data/civics.js';
-import { GOVERNMENTS, GOVERNMENT_KEYS, POLICIES, POLICY_KEYS, SLOT_NAMES, slotsOf, fitsSlot } from '../data/government.js';
+import { GOVERNMENTS, GOVERNMENT_KEYS, POLICIES, POLICY_KEYS, SLOT_NAMES, slotsFor, fitsSlot } from '../data/government.js';
 import { RULES } from '../data/rules.js';
 import { addPoints, studyCost, studyName, allStudied, canStudyNow, studyPath, setStudy, turnsToStudy } from './research.js';
 
@@ -49,7 +49,7 @@ export const policyChangeCost = (p, policies) => (p.freeChanges ? 0 : changedSlo
 // Why `policies` (one entry per slot of the current government, a card key or null) can't be
 // slotted, or null if it can.
 export function policiesReason(p, policies) {
-  const slots = slotsOf(p.government);
+  const slots = slotsFor(p);
   if (!p.government) return 'Choose a government first';
   if (!Array.isArray(policies) || policies.length !== slots.length) return `${GOVERNMENTS[p.government].name} has ${slots.length} policy slots`;
   const seen = new Set();
@@ -70,7 +70,7 @@ export function policiesReason(p, policies) {
 // Moves the slotted cards into another government's slots. First every card takes a free slot of
 // its own kind; then the rest take free wildcard slots, in order. Cards that don't fit are unslotted.
 export function refitPolicies(p, gov) {
-  const slots = slotsOf(gov);
+  const slots = slotsFor(p, gov);
   const out = Array(slots.length).fill(null);
   const cards = (p.policies || []).filter(Boolean);
   const left = [];

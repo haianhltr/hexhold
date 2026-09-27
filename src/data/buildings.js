@@ -46,3 +46,14 @@ export const BUILDINGS = {
   lighthouse: b('Lighthouse', 60, '+2 Food', { food: 2, district: 'harbor', tech: 'celestial' }),
   shipyard: b('Shipyard', 90, '+3 Production', { prod: 3, district: 'harbor', tech: 'shipbuilding' }),
 };
+
+// Unique buildings (see data/civs.js). Each replaces a standard building for one civilization and
+// keeps its unlock, district and requirements unless overridden.
+const ub = (base, civ, name, over, info) => ({ ...BUILDINGS[base], food: 0, prod: 0, gold: 0, science: 0, culture: 0, name, civ, replaces: base, ...over, info });
+Object.assign(BUILDINGS, {
+  bath: ub('aqueduct', 'rome', 'Bath', { food: 3, culture: 1 }, '+3 Food, +1 Culture'),
+  hanlin: ub('library', 'china', 'Hanlin Academy', { science: 3, culture: 1 }, '+3 Science, +1 Culture'),
+  electronics: ub('factory', 'japan', 'Electronics Factory', { prod: 4, culture: 3 }, '+4 Production, +3 Culture'),
+  ordu: ub('barracks', 'mongolia', 'Ordu', { unitBonus: 8, cost: 45 }, 'New military units +8 strength'),
+  tlachtli: ub('monument', 'aztec', 'Tlachtli', { culture: 2, gold: 2, cost: 35 }, '+2 Culture, +2 Gold'),
+});

@@ -15,6 +15,10 @@ That's **76 techs in 9 eras**, plus a repeatable **Future Tech**.
 - what each tech unlocks
 - all descriptions
 
+**Eurekas.** Almost every tech has a goal, in the **Eureka** column. Meeting it gives 40% of the tech's cost at once, whether or not you're researching it (China gets 55%). The goals are in `src/data/boosts.js`.
+
+**Civilizations.** Some units, buildings and improvements have a civilization's own version, which replaces the standard one for that civilization only. They're listed in [civilizations-dictionary.md](civilizations-dictionary.md).
+
 **Reading the tables**
 
 | Column | Meaning |
@@ -22,20 +26,21 @@ That's **76 techs in 9 eras**, plus a repeatable **Future Tech**.
 | **Cost** | Science needed |
 | **Needs** | Techs that must be researched first. Picking a locked tech in the game queues these automatically. |
 | **Unlocks** | What becomes available: units, buildings, districts, improvements, or a permanent bonus for your whole civilization |
+| **Eureka** | The goal that gives 40% of the tech's cost at once |
 
 ## Eras at a glance
 
 | Era | Techs | Cost per tech | Theme |
 |---|---|---|---|
 | Ancient | 11 | 22–32 | Settling, first farms and mines, bronze weapons |
-| Classical | 8 | 55–70 | Money, cavalry, iron, sea trade, public works |
-| Medieval | 8 | 95–115 | Workshops, universities, knights, castles |
-| Renaissance | 9 | 190–220 | Banking, gunpowder, printing, star forts |
-| Industrial | 8 | 275–315 | Factories, rifles, science as a discipline, steam |
-| Modern | 8 | 415–450 | Electricity, steel, tanks, research labs |
-| Atomic | 8 | 610–660 | Computers, rockets, combined arms |
-| Information | 9 | 840–930 | Satellites, composites, robotics |
-| Future | 7 | 1200–1560 | The last techs. **Offworld Mission wins the game.** |
+| Classical | 8 | 70–90 | Money, cavalry, iron, sea trade, public works |
+| Medieval | 8 | 120–145 | Workshops, universities, knights, castles |
+| Renaissance | 9 | 260–295 | Banking, gunpowder, printing, star forts |
+| Industrial | 8 | 410–470 | Factories, rifles, science as a discipline, steam |
+| Modern | 8 | 615–670 | Electricity, steel, tanks, research labs |
+| Atomic | 8 | 905–985 | Computers, rockets, combined arms |
+| Information | 9 | 1245–1380 | Satellites, composites, robotics |
+| Future | 7 | 1780–2315 | The last techs. **Offworld Mission wins the game.** |
 
 A player's **era** is the latest era in which they have researched at least one tech. It shows in the top bar and in Diplomacy.
 
@@ -43,125 +48,125 @@ A player's **era** is the latest era in which they have researched at least one 
 
 ## Ancient era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Pottery | 22 | — | **Granary** (+2 Food) |
-| Animal Husbandry | 22 | — | Wheat and Deer tiles +1 Food |
-| Mining | 22 | — | **Mine** improvement (+1 Production on hills) |
-| Sailing | 32 | — | Fish tiles +1 Food |
-| Astrology | 32 | — | **Shrine** (+2 Culture) |
-| Irrigation | 32 | Pottery | Farms +1 Food |
-| Archery | 32 | Animal Husbandry | **Archer** |
-| Writing | 32 | Pottery | **Campus** district, **Library** |
-| Masonry | 32 | Mining | **Walls** |
-| Bronze Working | 32 | Mining | **Spearman**, **Encampment** district, **Barracks** |
-| The Wheel | 32 | Mining | **Water Mill** (+1 Food, +1 Production) |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Pottery | 22 | — | **Granary** (+2 Food) | — |
+| Animal Husbandry | 22 | — | Wheat and Deer tiles +1 Food | — |
+| Mining | 22 | — | **Mine** improvement (+1 Production on hills) | — |
+| Sailing | 32 | — | Fish tiles +1 Food | Found a city on the coast |
+| Astrology | 32 | — | **Shrine** (+2 Culture) | Explore 10% of the map |
+| Irrigation | 32 | Pottery | Farms +1 Food | Improve a Wheat resource |
+| Archery | 32 | Animal Husbandry | **Archer** | Destroy an enemy unit |
+| Writing | 32 | Pottery | **Campus** district, **Library** | Meet another civilization |
+| Masonry | 32 | Mining | **Walls** | Build a Mine |
+| Bronze Working | 32 | Mining | **Spearman**, **Encampment** district, **Barracks** | Build 2 Mines |
+| The Wheel | 32 | Mining | **Water Mill** (+1 Food, +1 Production) | Improve a Stone resource |
 
 ## Classical era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Celestial Navigation | 55 | Sailing, Astrology | **Harbor** district, **Lighthouse** |
-| Currency | 55 | Writing | **Commercial Hub** district, **Market** |
-| Horseback Riding | 55 | Animal Husbandry | **Horseman** |
-| Iron Working | 55 | Bronze Working | **Swordsman** |
-| Shipbuilding | 70 | Sailing | **Shipyard** (in a Harbor) |
-| Mathematics | 70 | Currency | **Catapult** |
-| Construction | 70 | Masonry, Horseback Riding | Builders +1 use |
-| Engineering | 70 | The Wheel | **Aqueduct** (+2 Food). Walls +50 HP. |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Celestial Navigation | 70 | Sailing, Astrology | **Harbor** district, **Lighthouse** | Explore 20% of the map |
+| Currency | 70 | Writing | **Commercial Hub** district, **Market** | Have 100 Gold |
+| Horseback Riding | 70 | Animal Husbandry | **Horseman** | Train 3 Warriors |
+| Iron Working | 70 | Bronze Working | **Swordsman** | Build 3 Mines |
+| Shipbuilding | 90 | Sailing | **Shipyard** (in a Harbor) | Have 2 cities on the coast |
+| Mathematics | 90 | Currency | **Catapult** | Have 3 districts |
+| Construction | 90 | Masonry, Horseback Riding | Builders +1 use | Build a Water Mill |
+| Engineering | 90 | The Wheel | **Aqueduct** (+2 Food). Walls +50 HP. | Build Walls |
 
 ## Medieval era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Military Tactics | 95 | Mathematics | **Pikeman** |
-| Apprenticeship | 95 | Currency, Horseback Riding | **Industrial Zone** district, **Workshop**, **Man-at-Arms** |
-| Stirrups | 95 | Horseback Riding | **Knight** |
-| Machinery | 95 | Iron Working, Engineering | **Crossbowman**, **Lumber Mill** improvement (+2 Production on forest) |
-| Buttress | 95 | Shipbuilding, Mathematics | +1 Production in every city |
-| Education | 115 | Mathematics, Apprenticeship | **University** |
-| Military Engineering | 115 | Construction | **Trebuchet**, **Armory** |
-| Castles | 115 | Construction | **Castle** (needs Walls) |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Military Tactics | 120 | Mathematics | **Pikeman** | Train 2 Spearmen |
+| Apprenticeship | 120 | Currency, Horseback Riding | **Industrial Zone** district, **Workshop**, **Man-at-Arms** | Build 4 Mines |
+| Stirrups | 120 | Horseback Riding | **Knight** | Complete Feudalism |
+| Machinery | 120 | Iron Working, Engineering | **Crossbowman**, **Lumber Mill** improvement (+2 Production on forest) | Train 3 Archers |
+| Buttress | 120 | Shipbuilding, Mathematics | +1 Production in every city | Have 5 districts |
+| Education | 145 | Mathematics, Apprenticeship | **University** | Build 2 Libraries |
+| Military Engineering | 145 | Construction | **Trebuchet**, **Armory** | Build an Aqueduct |
+| Castles | 145 | Construction | **Castle** (needs Walls) | Adopt a Tier 2 government |
 
 ## Renaissance era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Cartography | 190 | Shipbuilding | +1 sight for every unit |
-| Mass Production | 190 | Shipbuilding, Education | Mines and Lumber Mills +1 Production |
-| Banking | 190 | Stirrups, Education | **Bank** |
-| Gunpowder | 190 | Apprenticeship, Stirrups, Military Engineering | **Musketman** |
-| Printing | 190 | Machinery | +10% Culture |
-| Square Rigging | 220 | Cartography | Coast tiles +1 Gold |
-| Astronomy | 220 | Education | **Observatory** |
-| Metal Casting | 220 | Gunpowder | **Bombard** |
-| Siege Tactics | 220 | Castles | **Star Fort** (needs Castle) |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Cartography | 260 | Shipbuilding | +1 sight for every unit | Build 2 Harbors |
+| Mass Production | 260 | Shipbuilding, Education | Mines and Lumber Mills +1 Production | Build 2 Lumber Mills |
+| Banking | 260 | Stirrups, Education | **Bank** | Complete Guilds |
+| Gunpowder | 260 | Apprenticeship, Stirrups, Military Engineering | **Musketman** | Build an Armory |
+| Printing | 260 | Machinery | +10% Culture | Build an University |
+| Square Rigging | 295 | Cartography | Coast tiles +1 Gold | Train a Musketman |
+| Astronomy | 295 | Education | **Observatory** | Build 2 Universities |
+| Metal Casting | 295 | Gunpowder | **Bombard** | Build 2 Workshops |
+| Siege Tactics | 295 | Castles | **Star Fort** (needs Castle) | Build a Castle |
 
 ## Industrial era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Industrialization | 275 | Mass Production | **Factory** |
-| Scientific Theory | 275 | Astronomy | +15% Science |
-| Ballistics | 275 | Metal Casting | **Field Cannon** |
-| Military Science | 275 | Printing, Siege Tactics | **Cavalry**, **Military Academy** |
-| Steam Power | 315 | Square Rigging, Industrialization | +1 move for every unit |
-| Sanitation | 315 | Scientific Theory | **Sewer** (+3 Food) |
-| Economics | 315 | Banking, Scientific Theory | **Stock Exchange** |
-| Rifling | 315 | Ballistics, Military Science | **Line Infantry**, **Ranger** |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Industrialization | 410 | Mass Production | **Factory** | Build 3 Workshops |
+| Scientific Theory | 410 | Astronomy | +15% Science | Complete The Enlightenment |
+| Ballistics | 410 | Metal Casting | **Field Cannon** | Train a Bombard |
+| Military Science | 410 | Printing, Siege Tactics | **Cavalry**, **Military Academy** | Destroy 10 enemy units |
+| Steam Power | 470 | Square Rigging, Industrialization | +1 move for every unit | Build 2 Shipyards |
+| Sanitation | 470 | Scientific Theory | **Sewer** (+3 Food) | Grow a city to 12 population |
+| Economics | 470 | Banking, Scientific Theory | **Stock Exchange** | Build 2 Banks |
+| Rifling | 470 | Ballistics, Military Science | **Line Infantry**, **Ranger** | Train 3 Musketmen |
 
 ## Modern era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Flight | 415 | Industrialization, Scientific Theory | +1 sight for every unit |
-| Replaceable Parts | 415 | Economics | **Infantry** |
-| Steel | 415 | Ballistics | **Artillery**. Cities +10 strength. |
-| Electricity | 450 | Steam Power | **Power Plant** |
-| Radio | 450 | Steam Power, Flight | **Broadcast Center** |
-| Chemistry | 450 | Sanitation | **Research Lab**, **Anti-Tank Crew** |
-| Combustion | 450 | Rifling, Steel | **Tank** |
-| Refining | 450 | Rifling | Factories +2 Production |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Flight | 615 | Industrialization, Scientific Theory | +1 sight for every unit, +25% Tourism | Build a Factory |
+| Replaceable Parts | 615 | Economics | **Infantry** | Train 3 Line Infantry |
+| Steel | 615 | Ballistics | **Artillery**. Cities +10 strength. | Build 8 Mines |
+| Electricity | 670 | Steam Power | **Power Plant** | Build 2 Factories |
+| Radio | 670 | Steam Power, Flight | **Broadcast Center**, +25% Tourism | Complete Conservation |
+| Chemistry | 670 | Sanitation | **Research Lab**, **Anti-Tank Crew** | Build 4 Universities |
+| Combustion | 670 | Rifling, Steel | **Tank** | Train 2 Field Cannons |
+| Refining | 670 | Rifling | Factories +2 Production | Build 3 Factories |
 
 ## Atomic era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Advanced Flight | 610 | Radio | Units heal +10 HP per turn |
-| Rocketry | 610 | Radio, Chemistry | +10% Science |
-| Advanced Ballistics | 610 | Replaceable Parts, Steel | **Machine Gun** |
-| Combined Arms | 610 | Steel, Combustion | Melee units +5 strength |
-| Plastics | 610 | Combustion | Coast tiles +1 Production |
-| Computers | 660 | Electricity, Radio | +10% Science and Culture |
-| Nuclear Fission | 660 | Advanced Ballistics, Combined Arms | +15% Production |
-| Synthetic Materials | 660 | Plastics | +2 Food in every city |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Advanced Flight | 905 | Radio | Units heal +10 HP per turn | Destroy 25 enemy units |
+| Rocketry | 905 | Radio, Chemistry | +10% Science | Build a Research Lab |
+| Advanced Ballistics | 905 | Replaceable Parts, Steel | **Machine Gun** | Train 2 Artillery |
+| Combined Arms | 905 | Steel, Combustion | Melee units +5 strength | Train 3 Infantry |
+| Plastics | 905 | Combustion | Coast tiles +1 Production | Build 12 Mines |
+| Computers | 985 | Electricity, Radio | +10% Science and Culture, +25% Tourism | Adopt a Tier 3 government |
+| Nuclear Fission | 985 | Advanced Ballistics, Combined Arms | +15% Production | Build 2 Research Labs |
+| Synthetic Materials | 985 | Plastics | +2 Food in every city | Grow a city to 20 population |
 
 ## Information era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Telecommunications | 840 | Computers | +15% Gold |
-| Satellites | 840 | Advanced Flight, Rocketry | Reveals the whole map. **Mechanized Infantry**. |
-| Guidance Systems | 840 | Rocketry, Advanced Ballistics | **Rocket Artillery** |
-| Lasers | 840 | Nuclear Fission | Ranged and siege units +10 ranged strength |
-| Composites | 840 | Synthetic Materials | **Modern Armor**, **Modern Anti-Tank** |
-| Stealth Technology | 840 | Synthetic Materials | Every unit +5 defense |
-| Robotics | 930 | Computers | +15% Production |
-| Nanotechnology | 930 | Composites | Campus districts +3 Science |
-| Nuclear Fusion | 930 | Lasers | +3 Production in every city |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Telecommunications | 1245 | Computers | +15% Gold | Build 2 Broadcast Centers |
+| Satellites | 1245 | Advanced Flight, Rocketry | Reveals the whole map. **Mechanized Infantry**. | Explore 80% of the map |
+| Guidance Systems | 1245 | Rocketry, Advanced Ballistics | **Rocket Artillery** | Destroy 40 enemy units |
+| Lasers | 1245 | Nuclear Fission | Ranged and siege units +10 ranged strength | Train 2 Machine Guns |
+| Composites | 1245 | Synthetic Materials | **Modern Armor**, **Modern Anti-Tank** | Train 3 Tanks |
+| Stealth Technology | 1245 | Synthetic Materials | Every unit +5 defense | Have 20 military units |
+| Robotics | 1380 | Computers | +15% Production | Build 3 Power Plants |
+| Nanotechnology | 1380 | Composites | Campus districts +3 Science | Build 15 Mines |
+| Nuclear Fusion | 1380 | Lasers | +3 Production in every city | Build 5 Research Labs |
 
 ## Future era
 
-| Tech | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Seasteads | 1200 | Nanotechnology | Coast tiles +2 Food |
-| Advanced AI | 1200 | Robotics | +20% Science |
-| Advanced Power Cells | 1200 | Nuclear Fusion | +1 move for every unit |
-| Cybernetics | 1200 | Robotics | Every unit +5 strength |
-| Smart Materials | 1200 | Nanotechnology | +3 Production in every city |
-| Predictive Systems | 1200 | Telecommunications | +20% Gold |
-| **Offworld Mission** | 1560 | Advanced AI, Advanced Power Cells, Smart Materials, Satellites | **Science victory:** the first civilization to research it wins |
-| Future Tech | 1600 | Everything else | Repeatable, +5 score each. Only reachable when you keep playing after a victory. |
+| Tech | Cost | Needs | Unlocks | Eureka |
+|---|---|---|---|---|
+| Seasteads | 1780 | Nanotechnology | Coast tiles +2 Food | Build 4 Harbors |
+| Advanced AI | 1780 | Robotics | +20% Science | Build 6 Research Labs |
+| Advanced Power Cells | 1780 | Nuclear Fusion | +1 move for every unit | Complete Optimization Imperative |
+| Cybernetics | 1780 | Robotics | Every unit +5 strength | Adopt a Tier 4 government |
+| Smart Materials | 1780 | Nanotechnology | +3 Production in every city | Have 20 districts |
+| Predictive Systems | 1780 | Telecommunications | +20% Gold | Complete Globalization |
+| **Offworld Mission** | 2315 | Advanced AI, Advanced Power Cells, Smart Materials, Satellites | **Science victory:** the first civilization to research it wins | — |
+| Future Tech | 2000 | Everything else | Repeatable, +5 score each. Only reachable when you keep playing after a victory. |
 
 ---
 
@@ -263,4 +268,4 @@ These are the kinds of bonus a tech can grant. They're data fields in `src/data/
 - A **100-turn** game reaches the Renaissance or Industrial era.
 - A **250-turn** game can reach the Future era, and a strong civilization can launch the Offworld Mission.
 
-The AI-vs-AI soak test checks these targets, and the costs above are tuned against it. Governments and policy cards (see [civics-dictionary.md](civics-dictionary.md)) add a lot of science and production, so in 1.3 the costs from the Renaissance era on were raised to keep these targets.
+The AI-vs-AI soak test checks these targets, and the costs above are tuned against it. Governments and policy cards (see [civics-dictionary.md](civics-dictionary.md)) add a lot of science and production, and Eurekas cut research time, so costs were raised in 1.3 (from the Renaissance era on) and in 1.4 (from the Classical era on) to keep these targets.

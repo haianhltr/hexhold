@@ -7,20 +7,30 @@ import { rand } from './rng.js';
 import { distance, neighbors } from './hex.js';
 import { cityAt, militaryAt, civilianAt, atWar, removeUnit, placeUnit, hasTech } from './query.js';
 import { cityMaxHp, transferCity, cityHasStrike } from './city.js';
-import { effects } from './effects.js';
+import { effects, unitClassKeys } from './effects.js';
 import { canEnter } from './pathfind.js';
 import { checkElimination } from './victory.js';
+import { addCulture } from './civics.js';
 
 const total = (base, mods) => Math.max(1, base + mods.reduce((s, m) => s + m[1], 0));
 const woundPenalty = (hp) => -Math.floor((100 - hp) / 10);
+
+// A unit was destroyed: civilizations with a Flower War-style ability turn it into culture.
+function onKill(state, killer, victimType, events) {
+  const pct = effects(state, killer).killCulture;
+  if (pct && state.players[killer]?.alive) addCulture(state, killer, (UNITS[victimType].strength * pct) / 100, events);
+}
 
 const ANTI_CAV_BONUS = 10;
 
 // Strength bonuses from techs (Combined Arms, Stealth Technology, Cybernetics, Lasers).
 function techMods(state, unit, role, mods) {
-  const fx = effects(state, unit.owner).strength;
+  const all = effects(state, unit.owner);
+  const fx = all.strength;
   const cls = UNITS[unit.type].cls;
   if (cls === 'civilian') return;
+  const classBonus = unitClassKeys(unit.type).reduce((s, k) => s + (all.classStrength[k] || 0), 0);
+  if (classBonus) mods.push(['Civilization bonus', classBonus]);
   if (fx.all) mods.push(['Empire bonuses', fx.all]);
   if (role !== 'ranged' && fx.melee && cls === 'melee') mods.push(['Melee bonuses', fx.melee]);
   if (role === 'defense' && fx.defense) mods.push(['Defense bonuses', fx.defense]);
@@ -40,8 +50,9 @@ export function defenseOf(state, unit, vs = null) {
   if (tile.forest) mods.push(['Forest', RULES.forestDefense]);
   if (unit.fortified) mods.push(['Fortified', RULES.fortifyBonus]);
   antiCav(unit, vs, mods);
+  if (UNITS[unit.type].defenseBonus) mods.push([UNITS[unit.type].name, UNITS[unit.type].defenseBonus]);
   techMods(state, unit, 'defense', mods);
-  const w = woundPenalty(unit.hp);
+  const w = UNITS[unit.type].noWoundPenalty ? 0 : woundPenalty(unit.hp);
   if (w) mods.push(['Wounded', w]);
   return { base, mods, total: total(base, mods) };
 }
@@ -54,7 +65,7 @@ export function attackOf(state, unit, ranged, vsCity, vs = null) {
   if (vsCity && def.vsCity) mods.push(['Siege', def.vsCity]);
   if (!ranged) antiCav(unit, vs, mods);
   techMods(state, unit, ranged ? 'ranged' : 'attack', mods);
-  const w = woundPenalty(unit.hp);
+  const w = def.noWoundPenalty ? 0 : woundPenalty(unit.hp);
   if (w) mods.push(['Wounded', w]);
   return { base, mods, total: total(base, mods) };
 }
@@ -198,6 +209,7 @@ export function resolveAttack(state, unit, target, events) {
       removeUnit(state, d);
       attacker.stats.kills++;
       defender.stats.lost++;
+      onKill(state, unit.owner, d.type, events);
       if (unit.hp <= 0) unit.hp = 1;
       if (!info.ranged) {
         const civ = civilianAt(state, target);
@@ -213,6 +225,7 @@ export function resolveAttack(state, unit, target, events) {
       removeUnit(state, unit);
       attacker.stats.lost++;
       defender.stats.kills++;
+      onKill(state, d.owner, unit.type, events);
     }
     return ev;
   }
@@ -264,6 +277,7 @@ export function resolveCityStrike(state, city, target, events) {
     removeUnit(state, info.unit);
     state.players[city.owner].stats.kills++;
     state.players[ev.defenderOwner].stats.lost++;
+    onKill(state, city.owner, ev.defenderType, events);
   }
   return ev;
 }

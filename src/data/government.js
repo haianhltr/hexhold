@@ -5,6 +5,8 @@
 // slot. A card whose `obsoleteBy` card is unlocked can't be slotted any more. Card and government
 // effects use the same fields as tech effects and are summed by core/effects.js.
 
+import { CIVS } from './civs.js';
+
 export const SLOT_TYPES = ['military', 'economic', 'wildcard'];
 export const SLOT_NAMES = { military: 'Military', economic: 'Economic', wildcard: 'Wildcard' };
 
@@ -33,6 +35,14 @@ export function slotsOf(gov) {
   const def = GOVERNMENTS[gov];
   if (!def) return [];
   return SLOT_TYPES.flatMap((type, k) => Array(def.slots[k]).fill(type));
+}
+
+// A player's slots under a government, with any extra slots from their civilization (Greece).
+export function slotsFor(p, gov = p.government) {
+  const base = slotsOf(gov);
+  if (!base.length) return base;
+  const extra = CIVS[p.civ]?.ability.effect.extraSlots || {};
+  return [...base, ...SLOT_TYPES.flatMap((type) => Array(extra[type] || 0).fill(type))];
 }
 
 const p = (name, slot, civic, effect, effectText, obsoleteBy = null) => ({ name, slot, civic, effect, effectText, ...(obsoleteBy ? { obsoleteBy } : {}) });
@@ -98,8 +108,8 @@ export const POLICIES = {
   revelation: p('Revelation', 'wildcard', 'mysticism', { capitalYield: { culture: 2 } }, '+2 Culture in the capital'),
   charismaticleader: p('Charismatic Leader', 'wildcard', 'politicalphilosophy', { cityYield: { culture: 1 } }, '+1 Culture in every city'),
   propaganda: p('Propaganda', 'wildcard', 'massmedia', { yieldPct: { culture: 15 } }, '+15% Culture', 'heritagetourism'),
-  heritagetourism: p('Heritage Tourism', 'wildcard', 'culturalheritage', { yieldPct: { culture: 25 } }, '+25% Culture'),
-  onlinecommunities: p('Online Communities', 'wildcard', 'socialmedia', { yieldPct: { culture: 15, science: 10 } }, '+15% Culture and +10% Science'),
+  heritagetourism: p('Heritage Tourism', 'wildcard', 'culturalheritage', { yieldPct: { culture: 15 }, tourismPct: 50 }, '+15% Culture and +50% Tourism'),
+  onlinecommunities: p('Online Communities', 'wildcard', 'socialmedia', { yieldPct: { culture: 15 }, tourismPct: 75 }, '+15% Culture and +75% Tourism'),
 };
 
 export const POLICY_KEYS = Object.keys(POLICIES);

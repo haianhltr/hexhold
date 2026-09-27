@@ -1,11 +1,18 @@
 // Tiny DOM helpers and the inline SVG icons used across the interface.
 
+import { EMBLEMS } from '../data/emblems.js';
+
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') {
+      for (const [p, val] of Object.entries(v)) {
+        if (p.startsWith('--')) el.style.setProperty(p, val);
+        else el.style[p] = val;
+      }
+    }
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
     else if (k === 'html') el.innerHTML = v;
     else if (v === true) el.setAttribute(k, '');
@@ -63,6 +70,11 @@ const PATHS = {
   close: '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   menu: '<path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   handshake: '<path d="M1.5 7 4 4.5l2.5 1L8 4.3l2 .2 3 3-1 1.2-2-1.6M3.5 8.5l3 3c.5.5 1.2.5 1.6 0l3.4-3.4M5.8 10.8l1-1M7.5 12.3l1-1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  crown: '<path d="M2 12 2.8 5l3 3L8 3l2.2 5 3-3L14 12Z"/><rect x="2" y="12.6" width="12" height="1.6" rx=".5"/>',
+  found: '<path d="M8 2 14 7.2h-1.6V14H9.6v-3.6H6.4V14H3.6V7.2H2Z"/>',
+  district: '<rect x="2" y="7" width="5" height="7" rx=".6"/><rect x="8" y="3" width="6" height="11" rx=".6"/>',
+  tourism: '<rect x="2" y="5" width="12" height="9" rx="1.6"/><path d="M6 5V3.4h4V5" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+  boost: '<path d="M9.4 1 3.5 9h3.9L6.4 15l6.1-8.2H8.6Z"/>',
 };
 
 export function icon(name, cls = '') {
@@ -81,7 +93,9 @@ export function iconEl(name, cls = '') {
 // A civ's emblem as inline SVG, matching the shapes drawn on the map.
 export function emblemSvg(kind, color, size = 16) {
   let body;
-  if (kind === 'sun') {
+  if (EMBLEMS[kind]) {
+    body = `<path d="${EMBLEMS[kind]}" fill="${color}"/>`;
+  } else if (kind === 'sun') {
     body = `<circle cx="8" cy="8" r="3.4" fill="${color}"/>` + Array.from({ length: 8 }, (_, k) => {
       const a = (k * Math.PI) / 4;
       return `<line x1="${8 + Math.cos(a) * 4.8}" y1="${8 + Math.sin(a) * 4.8}" x2="${8 + Math.cos(a) * 7.2}" y2="${8 + Math.sin(a) * 7.2}" stroke="${color}" stroke-width="1.4" stroke-linecap="round"/>`;

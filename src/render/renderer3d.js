@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { toPixel, fromPixel, neighbor, corner, EDGE_CORNERS } from '../core/hex.js';
 import { UNITS } from '../data/units.js';
+import { IMPROVEMENTS } from '../data/terrain.js';
 import { cityAt, militaryAt, civilianAt } from '../core/query.js';
 import { visibleTiles } from '../core/vision.js';
 import { cityMaxHp } from '../core/city.js';
@@ -785,6 +786,7 @@ export class Renderer3D {
     const farms = [];
     const mines = [];
     const mills = [];
+    const uniques = [];
     const addBuilding = (list, rlist, x, y, z, bw, bh, bd, rot, color, roofColor, roofH, tile) => {
       list.push({ x, y, z, sx: bw, sy: bh, sz: bd, rot, color, tile });
       rlist.push({ x, y: y + bh, z, sx: bw * 1.18, sy: roofH, sz: bd * 1.18, rot, color: roofColor, tile });
@@ -836,6 +838,7 @@ export class Renderer3D {
       } else if (t.imp === 'farm') farms.push({ i, cx, cy, cz });
       else if (t.imp === 'mine') mines.push({ i, cx, cy, cz });
       else if (t.imp === 'lumbermill') mills.push({ i, cx, cy, cz });
+      else if (t.imp && IMPROVEMENTS[t.imp]?.civ) uniques.push({ i, cx, cy, cz, kind: t.imp });
       if (t.res && !t.district && !cityAt(s, i)) {
         const sp = this.sprite(`res:${t.res}`, 24, 24, (ctx) => drawResource(ctx, t.res, 12, 12, 10.5), { dim: dim(i), depthTest: true });
         sp.position.set(cx + 0.46, cy + 0.2, cz + 0.36);
@@ -913,6 +916,29 @@ export class Renderer3D {
         list.push({ x: f.cx + 0.22, y: f.cy - 0.04, z: f.cz + 0.12, sx: 0.26, sy: 0.16, sz: 0.2, rot: 0.3, color: '#4A3F36', tile: f.i });
         list.push({ x: f.cx - 0.12, y: f.cy - 0.05, z: f.cz + 0.22, sx: 0.16, sy: 0.12, sz: 0.16, rot: 0.8, color: '#9C8F7C', tile: f.i });
       });
+      instanced(this.geo.box, list);
+    }
+    // Unique improvements, each a small landmark built from boxes.
+    if (uniques.length) {
+      const list = [];
+      const box = (f, x, y, z, sx, sy, sz, color, rot = 0.3) => list.push({ x: f.cx + x, y: f.cy + y, z: f.cz + z, sx, sy, sz, rot, color, tile: f.i });
+      for (const f of uniques) {
+        if (f.kind === 'sphinx') {
+          box(f, 0.05, -0.03, 0.2, 0.42, 0.1, 0.16, '#C9A55E');
+          box(f, 0.22, -0.03, 0.2, 0.12, 0.22, 0.14, '#BF9A50');
+        } else if (f.kind === 'pairidaeza') {
+          box(f, 0, -0.03, 0.15, 0.6, 0.05, 0.46, '#4F8F45', 0);
+          box(f, 0, -0.01, 0.15, 0.14, 0.04, 0.3, '#6FB3D9', 0);
+        } else if (f.kind === 'stepwell') {
+          box(f, 0, -0.03, 0.18, 0.46, 0.06, 0.46, '#B89A6A', 0);
+          box(f, 0, -0.01, 0.18, 0.2, 0.05, 0.2, '#4E86B0', 0);
+        } else {
+          box(f, 0, -0.03, 0.2, 0.36, 0.2, 0.2, '#E7E0CF');
+          box(f, -0.2, -0.03, 0.2, 0.1, 0.3, 0.1, '#DCD4C1');
+          box(f, 0.2, -0.03, 0.2, 0.1, 0.3, 0.1, '#DCD4C1');
+          box(f, 0, 0.17, 0.2, 0.4, 0.05, 0.22, '#3F4E7A');
+        }
+      }
       instanced(this.geo.box, list);
     }
     if (mills.length) {

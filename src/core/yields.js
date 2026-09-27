@@ -60,7 +60,7 @@ export function cityYields(state, city) {
   for (const b of city.buildings) {
     const def = BUILDINGS[b];
     addInto(y, def, 1 + (def.district ? fx.buildingPct[def.district] || 0 : 0) / 100);
-    addInto(y, fx.buildingBonus[b]);
+    addInto(y, fx.buildingBonus[b] || fx.buildingBonus[def.replaces]);
   }
   addInto(y, fx.cityYield);
   addInto(y, fx.perDistrict, city.districts.length);

@@ -1,25 +1,30 @@
 // Full-screen and modal screens: title, setup, tech and civics trees, government, diplomacy, menu,
 // saves, settings, help, game over, and small confirmation dialogs.
 
-import { CIVS } from '../data/civs.js';
+import { CIVS, CIV_KEYS, districtNameFor } from '../data/civs.js';
+import { BUILDINGS } from '../data/buildings.js';
+import { IMPROVEMENTS } from '../data/terrain.js';
 import { TECHS, TECH_KEYS, ERAS, ERA_INDEX, eraOf } from '../data/techs.js';
 import { CIVICS, CIVIC_KEYS, civicEraOf } from '../data/civics.js';
-import { GOVERNMENTS, GOVERNMENT_KEYS, POLICIES, POLICY_KEYS, SLOT_TYPES, SLOT_NAMES, slotsOf, fitsSlot } from '../data/government.js';
+import { GOVERNMENTS, GOVERNMENT_KEYS, POLICIES, POLICY_KEYS, SLOT_TYPES, SLOT_NAMES, slotsFor, fitsSlot } from '../data/government.js';
 import { UNITS } from '../data/units.js';
 import { DIFFICULTY, MAP_SIZES, TURN_LIMITS, TURN_LIMIT_LABELS, RULES } from '../data/rules.js';
 import { atWar, haveMet, citiesOf, yearLabel } from '../core/query.js';
 import { playerYields } from '../core/yields.js';
-import { studyCost, canStudyNow, turnsToStudy } from '../core/research.js';
+import { studyCost, canStudyNow, turnsToStudy, canResearchNow } from '../core/research.js';
+import { boostGoal, goalText, goalProgress, isBoosted, boostShare } from '../core/boosts.js';
 import { availablePolicies, governmentUnlocked, governmentChangeCost, policyChangeCost, policySwapCost } from '../core/civics.js';
 import { militaryPower } from '../core/diplomacy.js';
 import { score, scoreBreakdown, rankings } from '../core/victory.js';
+import { cultureStatus, tourismOf } from '../core/tourism.js';
+import { historyPoints, civTitle } from '../core/history.js';
 import { seedFromText } from '../core/rng.js';
 import * as storage from '../save/storage.js';
-import { h, clear, fill, icon, emblemSvg, bar, fmt, YIELD_COLORS } from './dom.js';
+import { h, clear, fill, icon, emblemSvg, bar, fmt, YIELD_COLORS, YIELD_NAMES } from './dom.js';
 import { unlocksOf, civicUnlocksOf } from './events.js';
 import { setVolume, sfx, unlockAudio } from './sound.js';
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 
 // ---------- title & setup ----------
 
@@ -48,8 +53,29 @@ export function showTitle(app) {
   s.hidden = false;
 }
 
+// The three unique traits of a civilization, for the setup screen and elsewhere.
+export function civTraits(key) {
+  const c = CIVS[key];
+  const unit = UNITS[c.unit];
+  const out = [{ label: 'Ability', name: c.ability.name, text: c.ability.text }];
+  const stat = unit.ranged ? `${unit.ranged} ranged strength` : `${unit.strength} strength`;
+  out.push({ label: 'Unique unit', name: unit.name, text: `Replaces the ${UNITS[unit.replaces].name}. ${stat}, ${unit.moves} moves. ${unit.info}` });
+  const { kind, key: ik } = c.infra;
+  if (kind === 'building') {
+    const b = BUILDINGS[ik];
+    out.push({ label: 'Unique building', name: b.name, text: `Replaces the ${BUILDINGS[b.replaces].name}. ${b.info}.` });
+  } else if (kind === 'improvement') {
+    const d = IMPROVEMENTS[ik];
+    const ys = ['food', 'prod', 'gold', 'science', 'culture'].filter((y) => d[y]).map((y) => `+${d[y]} ${YIELD_NAMES[y]}`).join(', ');
+    out.push({ label: 'Unique improvement', name: d.name, text: `${ys}. Builders can make it on ${d.hint.toLowerCase()}.` });
+  } else {
+    out.push({ label: 'Unique district', name: c.districtNames[ik], text: c.infraText });
+  }
+  return out;
+}
+
 export function showSetup(app) {
-  const opts = { civ: 0, size: 'small', rivals: 2, difficulty: 'normal', turnLimit: 100 };
+  const opts = { civ: CIV_KEYS[0], size: 'small', rivals: 2, difficulty: 'normal', turnLimit: 100 };
   const s = app.screen;
   const seedInput = h('input', { type: 'text', id: 'setup-seed', placeholder: 'Random', maxlength: 24, 'aria-describedby': 'seed-help' });
   const group = (label, name, choices, get, set) => h('fieldset', { class: 'choice' },
@@ -60,15 +86,27 @@ export function showSetup(app) {
         h('input', { type: 'radio', name, id, value, checked: get() === value, onchange: () => set(value) }),
         h('span', {}, text, sub ? h('small', {}, sub) : null));
     })));
+  const detail = h('div', { class: 'civ-detail', 'aria-live': 'polite' });
+  const showCiv = (key) => {
+    const c = CIVS[key];
+    fill(detail,
+      h('div', { class: 'civ-detail-head', style: { '--civ': c.color } },
+        h('span', { html: emblemSvg(c.emblem, c.color, 40) }),
+        h('div', {}, h('b', {}, c.name), h('small', {}, `Led by ${c.leader} · Capital: ${c.cities[0]}`))),
+      h('dl', { class: 'civ-traits' }, ...civTraits(key).flatMap((t) => [h('dt', {}, t.label), h('dd', {}, h('b', {}, t.name), ` ${t.text}`)])));
+  };
   const civGroup = h('fieldset', { class: 'choice civs' }, h('legend', {}, 'Your civilization'),
-    h('div', { class: 'civ-row' }, ...CIVS.map((c, i) => {
-      const id = `setup-civ-${i}`;
+    h('div', { class: 'civ-row' }, ...CIV_KEYS.map((k) => {
+      const c = CIVS[k];
+      const id = `setup-civ-${k}`;
       return h('label', { class: 'civ-card', for: id, style: { '--civ': c.color } },
-        h('input', { type: 'radio', name: 'civ', id, value: i, checked: i === 0, onchange: () => (opts.civ = i) }),
-        h('span', { class: 'civ-emblem', html: emblemSvg(c.emblem, c.color, 34) }),
+        h('input', { type: 'radio', name: 'civ', id, value: k, checked: k === opts.civ, onchange: () => { opts.civ = k; showCiv(k); } }),
+        h('span', { class: 'civ-emblem', html: emblemSvg(c.emblem, c.color, 30) }),
         h('b', {}, c.name),
-        h('small', {}, `Capital: ${c.cities[0]}`));
-    })));
+        h('small', {}, c.leader));
+    })),
+    detail);
+  showCiv(opts.civ);
   const form = h('form', { class: 'setup-card', onsubmit: (e) => {
     e.preventDefault();
     const seed = seedInput.value.trim() ? seedFromText(seedInput.value) : undefined;
@@ -129,17 +167,17 @@ const TREES = {
   tech: {
     table: TECHS, keys: TECH_KEYS, done: 'techs', progress: 'progress', current: 'research', path: 'researchPath', future: 'future',
     futureKey: 'future', futureName: 'Future Tech', yield: 'science', title: 'Technologies', label: 'Tech tree', noun: 'tech', nouns: 'techs',
-    action: (key) => ({ type: 'research', tech: key }), unlocks: (key) => unlocksOf(key), era: (p) => eraOf(p.techs),
+    action: (key) => ({ type: 'research', tech: key }), unlocks: (key, civ) => unlocksOf(key, civ), era: (p) => eraOf(p.techs),
   },
   civic: {
     table: CIVICS, keys: CIVIC_KEYS, done: 'civics', progress: 'civicProgress', current: 'civic', path: 'civicPath', future: 'futureCivics',
     futureKey: 'futurecivic', futureName: 'Future Civic', yield: 'culture', title: 'Civics', label: 'Civics tree', noun: 'civic', nouns: 'civics',
-    action: (key) => ({ type: 'civic', civic: key }), unlocks: (key) => civicUnlocksOf(key), era: (p) => civicEraOf(p.civics),
+    action: (key) => ({ type: 'civic', civic: key }), unlocks: (key, civ) => civicUnlocksOf(key, civ), era: (p) => civicEraOf(p.civics),
   },
 };
 
 // Card grid geometry for the timelines, in pixels.
-const TT = { w: 214, h: 82, colGap: 50, rowGap: 12, head: 30, pad: 10 };
+const TT = { w: 214, h: 98, colGap: 50, rowGap: 12, head: 30, pad: 10 };
 
 // Places every item of a tree on a column/row grid. Columns follow prerequisites (an item sits
 // right of everything it needs) and never mix eras; rows are ordered so lines cross as little as
@@ -243,8 +281,16 @@ export function openTree(app, track) {
     else if (queued) status = `Queued · ${turns} turns`;
     else if (available) status = `${Number.isFinite(turns) ? turns : '–'} turns`;
     else status = `${Number.isFinite(turns) ? turns : '–'} turns · needs ${t.req.filter((r) => !done.includes(r)).map((r) => T.table[r].name).join(', ')}`;
-    const unlocks = future ? [{ kind: 'effect', name: `+${RULES.score.future} score each` }] : T.unlocks(key);
+    const unlocks = future ? [{ kind: 'effect', name: `+${RULES.score.future} score each` }] : T.unlocks(key, p.civ);
     const name = future ? T.futureName : t.name;
+    // Its Eureka or Inspiration: the goal, progress toward it, or that it was met.
+    const goal = future || isDone ? null : boostGoal(track, key);
+    const boosted = goal && isBoosted(p, track, key);
+    const prog = goal && !boosted ? goalProgress(s, p.id, goal) : null;
+    const boostWord = track === 'tech' ? 'Eureka' : 'Inspiration';
+    const boostEl = goal ? h('span', { class: `tech-boost${boosted ? ' got' : ''}` },
+      h('span', { html: icon('boost') }),
+      h('span', { class: 'tech-boost-text' }, boosted ? `${boostWord}! ${goalText(goal)}` : `${goalText(goal)}${goal.n > 1 ? ` (${prog.have}/${prog.need})` : ''}`)) : null;
     const where = pos[key];
     const el = h('button', {
       type: 'button',
@@ -252,12 +298,13 @@ export function openTree(app, track) {
       disabled: isDone || (future && !available),
       'aria-pressed': current ? 'true' : 'false',
       'data-tech': key,
-      title: `${name}. ${status}.${unlocks.length ? ` Unlocks: ${unlocks.map((u) => u.name).join(', ')}.` : ''}`,
+      title: `${name}. ${status}.${goal ? ` ${boostWord}${boosted ? ' earned' : ` (+${boostShare(s, p.id)}%)`}: ${goalText(goal)}.` : ''}${unlocks.length ? ` Unlocks: ${unlocks.map((u) => u.name).join(', ')}.` : ''}`,
       style: { left: `${techX(where.col)}px`, top: `${techY(where.row)}px`, width: `${TT.w}px`, height: `${TT.h}px` },
       onclick: () => pick(key),
     },
       h('span', { class: 'tech-name' }, name),
       h('span', { class: 'tech-status' }, status),
+      boostEl,
       current || progress ? bar(progress / studyCost(key, track), YIELD_COLORS[T.yield], 'Progress') : null,
       h('span', { class: 'tech-unlocks' }, ...unlocks.map((u) => h('span', { class: `chip ${u.kind}` }, u.name))),
       h('span', { class: 'tech-cost' }, `${studyCost(key, track)}`, h('span', { html: icon(T.yield) })));
@@ -301,7 +348,7 @@ export function openTree(app, track) {
     const q = search.value.trim().toLowerCase();
     let first = null;
     for (const [key, el] of cards) {
-      const text = key === T.futureKey ? T.futureName.toLowerCase() : `${T.table[key].name} ${T.unlocks(key).map((u) => u.name).join(' ')}`.toLowerCase();
+      const text = key === T.futureKey ? T.futureName.toLowerCase() : `${T.table[key].name} ${T.unlocks(key, p.civ).map((u) => u.name).join(' ')}`.toLowerCase();
       const hit = q.length > 1 && text.includes(q);
       el.classList.toggle('match', hit);
       el.classList.toggle('dim', q.length > 1 && !hit);
@@ -337,7 +384,7 @@ export function openGovernment(app, draft = null, selected = null, filter = 'all
   const s = app.state;
   const p = app.human;
   const gov = p.government ? GOVERNMENTS[p.government] : null;
-  const slots = slotsOf(p.government);
+  const slots = slotsFor(p);
   draft = draft && draft.length === slots.length ? draft : [...(p.policies || [])];
   const rerender = (d = draft, sel = selected, f = filter) => openGovernment(app, d, sel, f);
   const cost = policyChangeCost(p, draft);
@@ -440,6 +487,80 @@ export function openGovernment(app, draft = null, selected = null, filter = 'all
   app.openModal(content, { wide: true, label: 'Government' });
 }
 
+// ---------- history and victory progress ----------
+
+const MOMENT_ICONS = { found: 'found', district: 'district', science: 'science', culture: 'culture', handshake: 'handshake', strength: 'strength', food: 'food', star: 'crown' };
+
+// Victory progress for every civilization the player knows, and the timeline of historic moments.
+export function openHistory(app, tab = 'progress', scope = 'mine') {
+  if (!app.state) return;
+  const s = app.state;
+  const hid = app.humanId;
+  const ended = s.phase === 'ended';
+  const known = (pid) => pid === hid || ended || haveMet(s, hid, pid);
+  const civs = s.players.filter((p) => known(p.id));
+  const who = (p) => h('span', { class: 'who' }, h('span', { html: emblemSvg(p.emblem, p.color, 16) }), ` ${p.name}${p.alive ? '' : ' (fallen)'}`);
+  const meter = (frac, color) => bar(frac, color);
+
+  const tabs = h('div', { class: 'era-nav', role: 'tablist', 'aria-label': 'History' }, ...[['progress', 'Victory progress'], ['timeline', 'Timeline']].map(([k, label]) =>
+    h('button', { type: 'button', role: 'tab', 'aria-selected': tab === k ? 'true' : 'false', class: `btn small ghost${tab === k ? ' active' : ''}`, onclick: () => openHistory(app, k, scope) }, label)));
+
+  let body;
+  if (tab === 'progress') {
+    const alive = civs.filter((p) => p.alive);
+    const goal = TECH_KEYS.find((k) => TECHS[k].effect?.victory);
+    const capitals = Object.values(s.cities).filter((c) => c.origCap != null);
+    const cult = cultureStatus(s, hid);
+    const myTourism = tourismOf(s, hid);
+    const section = (title, text, rows) => h('section', { class: 'stack vp' }, h('h3', {}, title), h('p', { class: 'small muted' }, text), h('div', { class: 'vp-rows' }, ...rows));
+    body = h('div', { class: 'vp-grid' },
+      section('Science', `Research ${TECHS[goal].name}, the last tech, to win.`, alive.map((p) =>
+        h('div', { class: 'vp-row' }, who(p), meter(p.techs.length / TECH_KEYS.length, YIELD_COLORS.science),
+          h('span', { class: 'vp-num' }, canResearchNow(p, goal) ? 'Can launch' : `${p.techs.length}/${TECH_KEYS.length} techs`)))),
+      section('Culture', `Draw more visitors from every civilization than it has tourists at home. You make ${fmt(myTourism)} Tourism per turn${me(s, hid).civics.includes(RULES.tourism.startCivic) ? '' : `; most Tourism starts with ${CIVICS[RULES.tourism.startCivic].name}`}.`,
+        cult.map((c) => {
+          const o = s.players[c.id];
+          const met = haveMet(s, hid, c.id);
+          return h('div', { class: 'vp-row' }, who(o), meter(c.domestic ? Math.min(1, c.visitors / (c.domestic + 1)) : c.visitors > 0 ? 1 : 0, YIELD_COLORS.culture),
+            h('span', { class: 'vp-num' }, !met ? 'Not met yet' : c.dominant ? `Dominant · ${c.visitors} visitors` : `${c.visitors} visitors / ${c.domestic} at home`));
+        }).concat(alive.filter((p) => p.id !== hid).map((p) => {
+          const n = cultureStatus(s, p.id).filter((x) => x.dominant).length;
+          return n ? h('div', { class: 'vp-row small muted' }, who(p), h('span', {}), h('span', { class: 'vp-num' }, `Dominates ${n} of ${alive.length - 1}`)) : null;
+        }).filter(Boolean))),
+      section('Domination', `Hold every original capital. ${capitals.length} were founded.`, alive.map((p) => {
+        const held = capitals.filter((c) => c.owner === p.id).length;
+        return h('div', { class: 'vp-row' }, who(p), meter(capitals.length ? held / capitals.length : 0, '#E0564A'), h('span', { class: 'vp-num' }, `${held} capital${held === 1 ? '' : 's'}`));
+      })),
+      section('Score', `The highest score wins when turn ${s.turnLimit} ends.`, [...alive].sort((a, b) => score(s, b.id) - score(s, a.id)).map((p, i, arr) =>
+        h('div', { class: 'vp-row' }, who(p), meter(score(s, p.id) / Math.max(1, score(s, arr[0].id)), YIELD_COLORS.gold), h('span', { class: 'vp-num' }, `${score(s, p.id)} points`)))));
+  } else {
+    const entries = (s.history || []).filter((m) => (scope === 'mine' ? m.p === hid : known(m.p)));
+    const scopeNav = h('div', { class: 'era-nav', role: 'group', 'aria-label': 'Whose history' }, ...[['mine', 'Your civilization'], ['world', 'Everyone you know']].map(([k, label]) =>
+      h('button', { type: 'button', class: `btn small ghost${scope === k ? ' active' : ''}`, onclick: () => openHistory(app, 'timeline', k) }, label)));
+    const rows = [];
+    let lastTurn = null;
+    for (const m of entries) {
+      const p = s.players[m.p];
+      rows.push(h('li', { class: `moment${m.w ? ' world' : ''}` },
+        h('span', { class: 'moment-when' }, m.t !== lastTurn ? `${yearLabel(s, m.t)} · Turn ${m.t}` : ''),
+        h('span', { class: 'moment-icon', html: icon(MOMENT_ICONS[m.i] || 'crown') }),
+        h('span', { class: 'moment-text' }, scope === 'world' ? h('span', { html: emblemSvg(p.emblem, p.color, 14) }) : null, ` ${m.x}`, m.w ? h('span', { class: 'tag' }, 'World first') : null),
+        h('span', { class: 'moment-pts' }, m.pts ? `+${m.pts}` : '')));
+      lastTurn = m.t;
+    }
+    body = h('div', { class: 'stack' },
+      h('div', { class: 'row-between' }, h('p', { class: 'small muted' }, `${historyPoints(s, hid)} points of historic moments, worth ${historyPoints(s, hid) * RULES.score.moment} score. Being the first in the world is worth more.`), scopeNav),
+      rows.length ? h('ol', { class: 'timeline' }, ...rows) : h('p', { class: 'muted' }, 'Nothing yet. Found a city to begin your history.'));
+  }
+  app.openModal(h('div', { class: 'stack history' },
+    h('div', { class: 'row-between gov-top' }, h('div', {}, h('h2', {}, 'History'), h('p', { class: 'small muted' }, `${civTitle(s, hid)} · ${yearLabel(s)}`)), tabs),
+    body), { wide: true, label: 'History' });
+  const list = document.querySelector('.timeline');
+  if (list) list.scrollTop = list.scrollHeight;
+}
+
+const me = (s, hid) => s.players[hid];
+
 // ---------- diplomacy ----------
 
 export function openDiplomacy(app) {
@@ -462,7 +583,7 @@ export function openDiplomacy(app) {
     return h('div', { class: `dip-row${war ? ' war' : ''}` },
       h('span', { class: 'dip-emblem', html: emblemSvg(o.emblem, o.color, 28) }),
       h('div', { class: 'dip-info' },
-        h('b', {}, o.name),
+        h('b', {}, o.name, CIVS[o.civ] ? h('span', { class: 'muted small' }, ` · ${CIVS[o.civ].leader} · ${CIVS[o.civ].ability.name}`) : null),
         h('p', { class: 'small' }, war ? h('span', { class: 'warn-text' }, `At war since turn ${since}`) : h('span', { class: 'good-text' }, 'At peace'), h('span', { class: 'muted' }, ` · ${citiesOf(s, o.id).length} cities · score ${score(s, o.id)} · ${strength}`))),
       h('div', { class: 'dip-actions' },
         war
@@ -485,6 +606,7 @@ export function openMenu(app) {
     inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openTechTree(app) }, 'Tech tree') : null,
     inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openCivicsTree(app) }, 'Civics tree') : null,
     inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openGovernment(app) }, 'Government') : null,
+    inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openHistory(app) }, 'History') : null,
     inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openSaves(app, 'save') }, 'Save game') : null,
     h('button', { type: 'button', class: 'btn', onclick: () => openSaves(app, 'load') }, 'Load game'),
     inGame ? h('button', { type: 'button', class: 'btn', onclick: () => openTransfer(app) }, 'Export or import a save') : null,
@@ -632,14 +754,18 @@ export function openHelp(app) {
     ['Click a unit', 'Select it'], ['Click a highlighted tile', 'Move there, or attack a red tile'], ['Right-click', 'Move or attack with the selected unit'],
     ['Drag / WASD / arrows', 'Pan the map'], ['Scroll / + / −', 'Zoom'], ['Enter', 'End turn, or jump to what needs orders'], ['Shift+Enter', 'End turn anyway'],
     ['Space', 'Skip unit'], ['F', 'Fortify'], ['Z', 'Sleep'], ['B', 'Found city'], ['U', 'Upgrade unit'], ['Tab or .', 'Next unit'], ['C', 'Center on selection'],
-    ['T', 'Tech tree'], ['V', 'Civics tree'], ['G', 'Government'], ['P', 'Diplomacy'], ['Y', 'Tile yields'], ['Esc', 'Cancel, deselect, then menu'], ['Delete', 'Disband unit'],
+    ['T', 'Tech tree'], ['V', 'Civics tree'], ['G', 'Government'], ['P', 'Diplomacy'], ['R', 'History and victory progress'], ['Y', 'Tile yields'], ['Esc', 'Cancel, deselect, then menu'], ['Delete', 'Disband unit'],
   ];
   app.openModal(h('div', { class: 'stack help' },
     h('h2', {}, 'How to play'),
     h('div', { class: 'help-grid' },
       h('section', {},
         h('h3', {}, 'Winning'),
-        h('p', {}, `Capture every rival's original capital for a domination victory, or be first to research Offworld Mission, the last tech of the Future Era, for a science victory. Otherwise the highest score when the turn limit ends wins. You lose if you lose all your cities.`),
+        h('p', {}, `Capture every rival's original capital for a domination victory, be first to research Offworld Mission for a science victory, or draw more visiting tourists from every civilization than it has at home for a culture victory. Tourism comes from culture once you complete Humanism. Otherwise the highest score when the turn limit ends wins. You lose if you lose all your cities.`),
+        h('h3', {}, 'Civilizations'),
+        h('p', {}, `Each of the ${CIV_KEYS.length} civilizations has a historical leader, an ability, a unique unit, and a unique building, district or improvement. They are listed on the New game screen.`),
+        h('h3', {}, 'Eurekas, Inspirations and history'),
+        h('p', {}, `Almost every tech and civic has a goal, shown on its card. Meet it for a Eureka or Inspiration worth ${RULES.boostPct}% of its cost. Your civilization's historic moments are recorded on the History screen (R) and add to your score.`),
         h('h3', {}, 'Technology'),
         h('p', {}, `${TECH_KEYS.length} techs across ${ERAS.length} eras unlock units, buildings, districts and lasting bonuses. Pick any tech in the tree and the techs it needs are researched first. When a better unit is unlocked, the old one can no longer be built; upgrade it for gold inside your borders.`),
         h('h3', {}, 'Civics and government'),
@@ -671,11 +797,12 @@ export function showGameOver(app) {
   const place = ranked.findIndex((r) => r.id === hid) + 1;
   const ordinal = ['', 'first', 'second', 'third', 'fourth'][place] || `${place}th`;
   const outscored = s.victory === 'score' && !won;
-  const title = won ? 'Victory' : outscored ? 'Time is up' : s.victory === 'science' ? 'Outpaced' : 'Defeat';
+  const title = won ? 'Victory' : outscored ? 'Time is up' : s.victory === 'science' ? 'Outpaced' : s.victory === 'culture' ? 'Outshone' : 'Defeat';
   const how = {
     domination: won ? 'You hold every original capital. The world is yours.' : `${winner?.name} conquered every capital.`,
     score: won ? `Time ran out and ${s.players[hid].name} leads the world.` : `Time ran out. ${winner?.name} had the highest score and you finished ${ordinal} of ${ranked.length}.`,
     science: won ? 'Your Offworld Mission has launched. The future belongs to you.' : `${winner?.name} launched the Offworld Mission first.`,
+    culture: won ? 'Visitors from every nation fill your cities. Your culture has won over the world.' : `${winner?.name}'s culture has won over the world.`,
     defeat: 'Your last city has fallen.',
   }[s.victory];
   const allPlayers = [...s.players].sort((a, b) => (b.alive ? score(s, b.id) : -1) - (a.alive ? score(s, a.id) : -1));
@@ -702,6 +829,7 @@ export function showGameOver(app) {
     h('div', { class: 'row' },
       h('button', { type: 'button', class: 'btn primary', onclick: () => { app.closeModal(); showSetup(app); app.hud.hidden = true; } }, 'New game'),
       won ? h('button', { type: 'button', class: 'btn', onclick: () => { app.dispatch({ type: 'keepPlaying' }); app.closeModal(); } }, 'Keep playing') : null,
+      h('button', { type: 'button', class: 'btn', onclick: () => openHistory(app, 'timeline', 'world') }, 'View history'),
       h('button', { type: 'button', class: 'btn ghost', onclick: () => app.showTitle() }, 'Title screen'))), { wide: true, label: title, closable: false });
 }
 

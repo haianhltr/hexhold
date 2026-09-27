@@ -26,10 +26,10 @@ import { sfx, setVolume, unlockAudio } from './sound.js';
 import { HINTS } from './hints.js';
 import * as storage from '../save/storage.js';
 import { renderTopBar, renderUnitPanel, renderCityPanel, renderEndTurn, renderNotes, tileTooltip, combatTooltip, placementTooltip } from './panels.js';
-import { showTitle, openTechTree, openCivicsTree, openGovernment, openMenu, showGameOver, confirmModal, openHelp, peaceOfferModal, openDiplomacy } from './screens.js';
+import { showTitle, openTechTree, openCivicsTree, openGovernment, openHistory, openMenu, showGameOver, confirmModal, openHelp, peaceOfferModal, openDiplomacy } from './screens.js';
 import { describeEvent, eventSound } from './events.js';
 
-export const VERSION = '1.3.0';
+export const VERSION = '1.4.0';
 
 export class App {
   constructor(root) {
@@ -903,6 +903,9 @@ export class App {
         break;
       case 'g':
         openGovernment(this);
+        break;
+      case 'r':
+        openHistory(this);
         break;
       case 'y':
         this.settings.showYields = !this.settings.showYields;

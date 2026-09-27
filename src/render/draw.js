@@ -3,6 +3,10 @@
 
 import { corner } from '../core/hex.js';
 import { UNITS } from '../data/units.js';
+import { EMBLEMS } from '../data/emblems.js';
+
+const emblemPaths = {};
+const emblemPath = (kind) => (emblemPaths[kind] ||= new Path2D(EMBLEMS[kind]));
 
 export const TERRAIN_COLORS = {
   grass: '#86B45A',
@@ -232,6 +236,42 @@ export function drawImprovement(ctx, kind, s) {
     ctx.lineTo(s * 0.32, s * 0.02);
     ctx.lineTo(s * 0.32, s * 0.42);
     ctx.stroke();
+  } else if (kind === 'sphinx') {
+    // A crouching sandstone sphinx.
+    ctx.fillStyle = '#C9A55E';
+    ctx.fillRect(-s * 0.36, s * 0.2, s * 0.62, s * 0.2);
+    ctx.fillRect(s * 0.12, -s * 0.06, s * 0.2, s * 0.3);
+    ctx.fillStyle = '#A8843F';
+    ctx.fillRect(s * 0.1, -s * 0.12, s * 0.24, s * 0.09);
+  } else if (kind === 'pairidaeza') {
+    // A walled garden with a pool.
+    ctx.fillStyle = '#4F8F45';
+    ctx.fillRect(-s * 0.34, -s * 0.1, s * 0.68, s * 0.5);
+    ctx.fillStyle = '#6FB3D9';
+    ctx.fillRect(-s * 0.08, s * 0.02, s * 0.16, s * 0.26);
+    ctx.strokeStyle = '#D8C7A0';
+    ctx.lineWidth = s * 0.05;
+    ctx.strokeRect(-s * 0.34, -s * 0.1, s * 0.68, s * 0.5);
+  } else if (kind === 'stepwell') {
+    // Nested stone steps down to water.
+    for (const [k, col] of [[0.34, '#B89A6A'], [0.24, '#9C7F52'], [0.14, '#4E86B0']]) {
+      ctx.fillStyle = col;
+      ctx.fillRect(-s * k, s * (0.16 - k * 0.7), s * k * 2, s * k * 1.4);
+    }
+  } else if (kind === 'chateau') {
+    // A small château: a hall between two towers.
+    ctx.fillStyle = '#E7E0CF';
+    ctx.fillRect(-s * 0.26, s * 0.08, s * 0.52, s * 0.32);
+    ctx.fillRect(-s * 0.38, -s * 0.06, s * 0.14, s * 0.46);
+    ctx.fillRect(s * 0.24, -s * 0.06, s * 0.14, s * 0.46);
+    ctx.fillStyle = '#3F4E7A';
+    for (const x of [-0.31, 0.31]) {
+      ctx.beginPath();
+      ctx.moveTo(s * (x - 0.09), -s * 0.06);
+      ctx.lineTo(s * x, -s * 0.26);
+      ctx.lineTo(s * (x + 0.09), -s * 0.06);
+      ctx.fill();
+    }
   } else if (kind === 'lumbermill') {
     // A stack of logs, ends showing.
     for (const [lx, ly] of [[-0.16, 0.36], [0.16, 0.36], [0, 0.2]]) {
@@ -355,7 +395,12 @@ export function drawEmblem(ctx, kind, x, y, r, color) {
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
   ctx.lineCap = 'round';
-  if (kind === 'sun') {
+  if (EMBLEMS[kind]) {
+    // Civilization emblems are 16×16 path data; scale them to radius r.
+    ctx.scale(r / 8, r / 8);
+    ctx.translate(-8, -8);
+    ctx.fill(emblemPath(kind));
+  } else if (kind === 'sun') {
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
     ctx.fill();

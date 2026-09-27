@@ -7,19 +7,20 @@ import { TECHS, TECH_KEYS } from '../data/techs.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { CIVICS, CIVIC_KEYS } from '../data/civics.js';
-import { GOVERNMENTS, POLICIES, slotsOf, fitsSlot } from '../data/government.js';
+import { GOVERNMENTS, POLICIES, slotsFor, fitsSlot } from '../data/government.js';
 import { DIFFICULTY, RULES } from '../data/rules.js';
 import { improvementValid, IMPROVEMENTS } from '../data/terrain.js';
 import { applyAction } from '../core/actions.js';
 import { citiesOf, unitsOf, atWar, haveMet, cityAt, hasTech, militaryAt } from '../core/query.js';
 import { distance, neighbors, within } from '../core/hex.js';
 import { findPath, canEnter, passable } from '../core/pathfind.js';
-import { foundReason, buildOptions, bestDistrictTile, workableTiles, buyCost, cityHasStrike, upgradeTarget, upgradeCost, cityMaxHp } from '../core/city.js';
+import { foundReason, buildOptions, bestDistrictTile, workableTiles, buyCost, cityHasStrike, upgradeTarget, upgradeCost, cityMaxHp, improvementReason } from '../core/city.js';
 import { attackInfo, inRange, lineOfSight, cityStrikeInfo } from '../core/combat.js';
 import { militaryPower, aiWantsPeace } from '../core/diplomacy.js';
 import { canResearchNow, allResearched } from '../core/research.js';
 import { allCivics, canStudyCivic, availablePolicies, availableGovernments } from '../core/civics.js';
 import { adjacencyBonus } from '../core/placement.js';
+import { tourismOf } from '../core/tourism.js';
 import { startScore } from '../core/mapgen.js';
 import { visibleTiles } from '../core/vision.js';
 import { playerYields } from '../core/yields.js';
@@ -37,12 +38,13 @@ function techValue(ctx, key) {
   const conq = ctx.p.personality === 'conqueror';
   const war = atWarAny(ctx);
   let v = 1;
+  const mine = (d) => !d.civ || d.civ === ctx.p.civ; // other civilizations' unique items don't count
   for (const d of Object.values(UNITS)) {
-    if (d.tech !== key) continue;
+    if (d.tech !== key || !mine(d)) continue;
     if (d.cls === 'civilian') v += 2;
     else v += (conq ? 3.5 : 1.8) + (war ? 2.5 : 0);
   }
-  for (const d of Object.values(BUILDINGS)) if (d.tech === key) v += buildingValue(d, conq, false) * 0.8 + (d.defense ? (war ? 3 : 1) : 0);
+  for (const d of Object.values(BUILDINGS)) if (d.tech === key && mine(d)) v += buildingValue(d, conq, false) * 0.8 + (d.defense ? (war ? 3 : 1) : 0);
   for (const [k, d] of Object.entries(DISTRICTS)) if (d.tech === key) v += k === 'encampment' ? (conq ? 4 : 1.5) : 3.5;
   for (const d of Object.values(IMPROVEMENTS)) if (d.tech === key) v += 2.5;
   const e = TECHS[key].effect;
@@ -234,7 +236,7 @@ function holdings(ctx) {
   for (const t of state.map.tiles) if (t.owner === pid && t.imp) imps[t.imp] = (imps[t.imp] || 0) + 1;
   const army = unitsOf(state, pid).filter((u) => isMilitary(u.type));
   const outdated = army.filter((u) => upgradeTarget(state, u)).length;
-  ctx.held = { cities, n: Math.max(1, cities.length), districts, adjacency, buildings, imps, army: army.length, outdated, y: playerYields(state, pid) };
+  ctx.held = { cities, n: Math.max(1, cities.length), districts, adjacency, buildings, imps, army: army.length, outdated, y: playerYields(state, pid), tourism: tourismOf(state, pid) };
   return ctx.held;
 }
 
@@ -269,6 +271,7 @@ function effectValue(ctx, e) {
   if (e.heal) v += war ? e.heal / 4 : 0.3;
   if (e.classMoves || e.moves) v += conq ? 2 : 0.6;
   if (e.sight) v += 0.5;
+  if (e.tourismPct) v += (H.tourism * e.tourismPct) / 100;
   return v;
 }
 
@@ -277,7 +280,8 @@ function civicValue(ctx, key) {
   let v = 1 + effectValue(ctx, CIVICS[key].effect);
   for (const g of Object.values(GOVERNMENTS)) if (g.civic === key) v += 6 + g.tier * 4 + (ctx.p.government ? 0 : 20);
   for (const c of Object.values(POLICIES)) if (c.civic === key) v += 1 + effectValue(ctx, c.effect);
-  for (const d of Object.values(BUILDINGS)) if (d.civic === key) v += buildingValue(d, conq, false) * 0.8;
+  for (const d of Object.values(BUILDINGS)) if (d.civic === key && (!d.civ || d.civ === ctx.p.civ)) v += buildingValue(d, conq, false) * 0.8;
+  for (const d of Object.values(IMPROVEMENTS)) if (d.civic === key && d.civ === ctx.p.civ) v += 4;
   for (const d of Object.values(DISTRICTS)) if (d.civic === key) v += 3.5;
   return v;
 }
@@ -310,7 +314,7 @@ function bestPolicies(ctx, gov) {
     .map((k) => ({ k, kind: POLICIES[k].slot, v: effectValue(ctx, POLICIES[k].effect) }))
     .filter((c) => c.v > 0.05)
     .sort((a, b) => b.v - a.v || (a.k < b.k ? -1 : 1));
-  const slots = slotsOf(gov);
+  const slots = slotsFor(ctx.p, gov);
   const out = Array(slots.length).fill(null);
   let value = 0;
   const used = new Set();
@@ -388,11 +392,27 @@ function bestMilitary(ctx, opts) {
   return { kind: 'unit', key: list[0].key };
 }
 
+// Improvements each player owns, counted once per change to the game (touch() bumps _ver).
+function improvementCounts(state, pid) {
+  if (state._impVer !== state._ver) {
+    state._imps = state.players.map(() => ({}));
+    for (const t of state.map.tiles) if (t.owner >= 0 && t.imp) state._imps[t.owner][t.imp] = (state._imps[t.owner][t.imp] || 0) + 1;
+    state._impVer = state._ver;
+  }
+  return state._imps[pid];
+}
+
 function improvementFor(state, pid, i) {
   const t = state.map.tiles[i];
   if (t.owner !== pid || t.district || t.imp || cityAt(state, i)) return null;
   if (hasTech(state, pid, 'mining') && improvementValid(t, 'mine')) return 'mine';
   if (hasTech(state, pid, 'machinery') && improvementValid(t, 'lumbermill')) return 'lumbermill';
+  // A unique improvement (Sphinx, Stepwell and the like) on every other flat tile without a resource.
+  const unique = Object.keys(IMPROVEMENTS).find((k) => IMPROVEMENTS[k].civ === state.players[pid].civ);
+  if (unique && !t.res && !improvementReason(state, pid, i, unique)) {
+    const n = improvementCounts(state, pid);
+    if ((n[unique] || 0) <= (n.farm || 0)) return unique;
+  }
   if (improvementValid(t, 'farm')) return 'farm';
   return null;
 }

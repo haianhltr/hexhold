@@ -8,6 +8,8 @@ import { citiesOf, unitsOf, cityAt, removeUnit } from './query.js';
 import { processCity } from './city.js';
 import { addScience } from './research.js';
 import { addCulture } from './civics.js';
+import { checkBoosts } from './boosts.js';
+import { tourismOf, addTourism, cultureStatus } from './tourism.js';
 import { unitUpkeep } from './yields.js';
 import { followPath } from './movement.js';
 import { refreshVision } from './vision.js';
@@ -53,10 +55,25 @@ export function endRound(state, events) {
       disbandForDebt(state, p.id, events);
       p.gold = 0;
     }
+    checkBoosts(state, p.id, events);
     addScience(state, p.id, science, events);
     // The free-change turn from a civic lasts one round; a civic finished now opens the next one.
     p.freeChanges = false;
     addCulture(state, p.id, culture, events);
+    p.cultureTotal = (p.cultureTotal || 0) + culture;
+  }
+
+  // Tourism builds up toward every civilization met; note each time one becomes dominant over another.
+  for (const p of state.players) {
+    if (!p.alive) continue;
+    addTourism(state, p.id, tourismOf(state, p.id));
+    for (const s of cultureStatus(state, p.id)) {
+      const key = `dominant:${s.id}`;
+      if (s.dominant && !(p.firsts || []).includes(key)) {
+        (p.firsts ||= []).push(key);
+        events.push({ type: 'dominant', player: p.id, over: s.id });
+      }
+    }
   }
 
   for (const id in state.units) {

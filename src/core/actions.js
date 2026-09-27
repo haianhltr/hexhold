@@ -16,12 +16,14 @@ import { attackInfo, inRange, resolveAttack, cityStrikeInfo, cityCanStrike, reso
 import {
   foundReason, foundCity, assignWorkers, buildReason, sameItem, completeItem, buyCost,
   borderCandidates, buyTileCost, claimTile, workableTiles, bestDistrictTile, cityHasStrike,
-  upgradeTarget, upgradeCost,
+  upgradeTarget, upgradeCost, improvementReason,
 } from './city.js';
 import { validDistrictTiles } from './placement.js';
 import { setResearch, techName } from './research.js';
 import { setCivic, civicName, governmentUnlocked, governmentChangeCost, refitPolicies, policiesReason, policyChangeCost } from './civics.js';
 import { effects } from './effects.js';
+import { checkBoosts } from './boosts.js';
+import { recordHistory } from './history.js';
 import { declareWar, makePeace, aiWantsPeace } from './diplomacy.js';
 import { refreshVision } from './vision.js';
 import { checkVictory, checkElimination } from './victory.js';
@@ -118,13 +120,8 @@ const HANDLERS = {
     if (!u || u.type !== 'builder') return 'Only builders can build improvements';
     if (u.moves <= 0) return 'This builder has no moves left this turn';
     const tile = state.map.tiles[u.tile];
-    const imp = IMPROVEMENTS[a.kind];
-    if (!imp) return 'Unknown improvement';
-    if (tile.owner !== u.owner) return 'Builders can only work inside your borders';
-    if (tile.district || cityAt(state, u.tile)) return "Cities and districts can't be improved";
-    if (!hasTech(state, u.owner, imp.tech)) return `Needs ${TECHS[imp.tech].name}`;
-    if (!improvementValid(tile, a.kind)) return `${imp.name}: ${imp.hint}`;
-    if (tile.imp === a.kind) return `There's already a ${imp.name} here`;
+    const why = improvementReason(state, u.owner, u.tile, a.kind);
+    if (why) return IMPROVEMENTS[a.kind] && why === IMPROVEMENTS[a.kind].hint ? `${IMPROVEMENTS[a.kind].name}: ${why}` : why;
     tile.imp = a.kind;
     u.charges--;
     u.moves = 0;
@@ -202,6 +199,7 @@ const HANDLERS = {
     u.moves = 0;
     u.acted = true;
     u.fortified = false;
+    p.stats.upgrades = (p.stats.upgrades || 0) + 1;
     ev.push({ type: 'upgraded', unit: u.id, owner: u.owner, from, to: target, tile: u.tile });
     return null;
   },
@@ -407,7 +405,9 @@ export function applyAction(state, action) {
   if (reason) return { ok: false, reason, events };
   touch(state);
   refreshVision(state, action.player, events);
+  checkBoosts(state, action.player, events);
   checkVictory(state, events);
+  recordHistory(state, events);
   if (!state._log) state._log = [];
   state._log.push({ turn: state.turn, ...action });
   if (state._log.length > 200) state._log.shift();

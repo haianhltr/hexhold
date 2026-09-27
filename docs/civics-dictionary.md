@@ -1,11 +1,11 @@
 # Hexhold civics dictionary
 
-This is the design reference for Hexhold's civics tree, governments and policy cards. It pairs with [tech-dictionary.md](tech-dictionary.md), and `src/data/civics.js` and `src/data/government.js` implement it.
+This is the design reference for Hexhold's civics tree, governments and policy cards. It pairs with [tech-dictionary.md](tech-dictionary.md). `src/data/civics.js`, `src/data/government.js` and `src/data/boosts.js` implement it, and `node tools/docs.mjs` regenerates this page from them.
 
 **Coverage.** The tree is modeled on Civilization VI's civics tree, including the Gathering Storm expansion's Environmentalism and its Future era. That's **59 civics in 9 eras**, plus a repeatable **Future Civic**.
 
 **What's ours.** Civic and government names are ordinary historical and political terms, and many policy cards borrow Civ VI's names. Everything else is Hexhold's own design, built on Hexhold's rules rather than Civ VI's:
-- culture costs and prerequisites
+- culture costs, prerequisites and Inspiration goals
 - the slot layout and bonus of every government
 - every policy card's effect
 - all descriptions
@@ -16,7 +16,8 @@ Hexhold has no religion, great people, city-states, trade routes, amenities, hou
 
 - **Culture researches civics** the way science researches techs. Every city's culture counts toward the current civic, and still grows that city's borders too.
 - Pick any civic in the tree. If it needs earlier civics, those are researched first.
-- Civics unlock **governments**, **policy cards**, the **Theater Square** with its first two buildings, and a few lasting bonuses.
+- Civics unlock **governments**, **policy cards**, the **Theater Square** with its first two buildings, a few unique improvements, and some lasting bonuses.
+- **Inspirations:** almost every civic has a goal (the **Inspiration** column). Meeting it gives 40% of the civic's cost at once, whether or not you're researching it. China gets more.
 - After every civic, a repeatable **Future Civic** (800 culture) adds +5 score each.
 - Each civic researched is worth 2 points of score, the same as a tech.
 
@@ -30,7 +31,7 @@ A government has **policy slots** of three kinds:
 | Economic | Economic cards |
 | Wildcard | Any card, including wildcard-only cards |
 
-Each card can be slotted once. When a later card replaces an older one (**Replaced by** below), the old card can't be slotted any more. If it was slotted, the replacement takes its place automatically.
+Each card can be slotted once. When a later card replaces an older one (**Replaced by** below), the old card can't be slotted any more. If it was slotted, the replacement takes its place automatically. Greece gets one extra wildcard slot in every government.
 
 **When changes are free.** On any turn you finish a civic, you can change government and policy cards for free until the end of the round. At other times:
 - each newly slotted card costs **20 gold + 3 per civic researched**
@@ -127,130 +128,130 @@ When you switch government, cards move to slots of their own kind first, then to
 | Revelation | Mysticism | +2 Culture in the capital | — |
 | Charismatic Leader | Political Philosophy | +1 Culture in every city | — |
 | Propaganda | Mass Media | +15% Culture | Heritage Tourism |
-| Heritage Tourism | Cultural Heritage | +25% Culture | — |
-| Online Communities | Social Media | +15% Culture and +10% Science | — |
+| Heritage Tourism | Cultural Heritage | +15% Culture and +50% Tourism | — |
+| Online Communities | Social Media | +15% Culture and +75% Tourism | — |
 
 ## Eras at a glance
 
 | Era | Civics | Culture per civic | Theme |
 |---|---|---|---|
 | Ancient | 7 | 20–40 | Laws, crafts, trade and the first government |
-| Classical | 7 | 65–80 | Philosophy, drama and the first real governments |
-| Medieval | 7 | 95–110 | Feudal duty, guilds, divine right |
-| Renaissance | 6 | 130–145 | Exploration, humanism and the Enlightenment |
-| Industrial | 7 | 170–185 | Nations, cities and the arts |
-| Modern | 9 | 205–230 | Ideology and the three modern governments |
-| Atomic | 5 | 260–275 | Cold war, sport and the space race |
-| Information | 3 | 310–310 | A connected world |
-| Future | 8 | 350–450 | Governments of the future |
+| Classical | 7 | 80–100 | Philosophy, drama and the first real governments |
+| Medieval | 7 | 120–140 | Feudal duty, guilds, divine right |
+| Renaissance | 6 | 165–180 | Exploration, humanism and the Enlightenment |
+| Industrial | 7 | 215–230 | Nations, cities and the arts |
+| Modern | 9 | 255–290 | Ideology and the three modern governments |
+| Atomic | 5 | 325–345 | Cold war, sport and the space race |
+| Information | 3 | 390–390 | A connected world |
+| Future | 8 | 440–565 | Governments of the future |
 
 ---
 
 ## Ancient era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Code of Laws | 20 | — | **Chiefdom** (government), Discipline (military), God King (economic), Urban Planning (economic) |
-| Craftsmanship | 30 | Code of Laws | Agoge (military), Ilkum (economic) |
-| Foreign Trade | 30 | Code of Laws | Caravansaries (economic) |
-| Early Empire | 40 | Foreign Trade | Colonization (economic), Land Surveyors (economic) |
-| Mysticism | 40 | Foreign Trade | Revelation (wildcard) |
-| Military Tradition | 40 | Craftsmanship | Maneuver (military) |
-| State Workforce | 40 | Craftsmanship | Conscription (military) |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Code of Laws | 20 | — | **Chiefdom** (government), Discipline (military), God King (economic), Urban Planning (economic) | — |
+| Craftsmanship | 30 | Code of Laws | Sphinx (Egypt only), Agoge (military), Ilkum (economic) | Improve 3 tiles |
+| Foreign Trade | 30 | Code of Laws | Caravansaries (economic) | Explore 15% of the map |
+| Early Empire | 40 | Foreign Trade | Colonization (economic), Land Surveyors (economic) | Found 3 cities |
+| Mysticism | 40 | Foreign Trade | Revelation (wildcard) | Build a Shrine |
+| Military Tradition | 40 | Craftsmanship | Maneuver (military) | Destroy 2 enemy units |
+| State Workforce | 40 | Craftsmanship | Conscription (military) | Build a district |
 
 ## Classical era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Political Philosophy | 65 | State Workforce, Early Empire | **Autocracy** (government), **Oligarchy** (government), **Classical Republic** (government), Charismatic Leader (wildcard) |
-| Games and Recreation | 65 | State Workforce | Insulae (economic) |
-| Drama and Poetry | 65 | Early Empire | **Theater Square** district, **Amphitheater** |
-| Military Training | 80 | Military Tradition, Games and Recreation | Veterancy (military) |
-| Defensive Tactics | 80 | Games and Recreation, Political Philosophy | Limes (military), Bastions (military) |
-| Recorded History | 80 | Political Philosophy, Drama and Poetry | Natural Philosophy (economic) |
-| Theology | 80 | Drama and Poetry, Mysticism | Scripture (economic) |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Political Philosophy | 80 | State Workforce, Early Empire | **Autocracy** (government), **Oligarchy** (government), **Classical Republic** (government), Pairidaeza (Persia only), Charismatic Leader (wildcard) | Meet 2 civilizations |
+| Games and Recreation | 80 | State Workforce | Insulae (economic) | Research Construction |
+| Drama and Poetry | 80 | Early Empire | **Theater Square** district, **Amphitheater** | Build 2 Monuments |
+| Military Training | 100 | Military Tradition, Games and Recreation | Veterancy (military) | Build an Encampment |
+| Defensive Tactics | 100 | Games and Recreation, Political Philosophy | Limes (military), Bastions (military) | Go to war |
+| Recorded History | 100 | Political Philosophy, Drama and Poetry | Natural Philosophy (economic) | Build 2 Campus |
+| Theology | 100 | Drama and Poetry, Mysticism | Scripture (economic) | Build 2 Shrines |
 
 ## Medieval era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Naval Tradition | 95 | Defensive Tactics | Naval Infrastructure (economic) |
-| Feudalism | 95 | Defensive Tactics | Serfdom (economic) |
-| Civil Service | 95 | Defensive Tactics, Recorded History | Meritocracy (economic) |
-| Mercenaries | 110 | Military Training, Feudalism | Professional Army (military) |
-| Medieval Faires | 110 | Feudalism | Trade Confederation (economic), Aesthetics (economic) |
-| Guilds | 110 | Feudalism, Civil Service | Town Charters (economic), Craftsmen (economic) |
-| Divine Right | 110 | Civil Service, Theology | **Monarchy** (government), Chivalry (military) |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Naval Tradition | 120 | Defensive Tactics | Naval Infrastructure (economic) | Have 3 cities on the coast |
+| Feudalism | 120 | Defensive Tactics | Serfdom (economic) | Build 6 Farms |
+| Civil Service | 120 | Defensive Tactics, Recorded History | Meritocracy (economic) | Grow a city to 10 population |
+| Mercenaries | 140 | Military Training, Feudalism | Professional Army (military) | Have 8 military units |
+| Medieval Faires | 140 | Feudalism | Trade Confederation (economic), Aesthetics (economic) | Build 2 Markets |
+| Guilds | 140 | Feudalism, Civil Service | Town Charters (economic), Craftsmen (economic) | Build 2 Commercial Hubs |
+| Divine Right | 140 | Civil Service, Theology | **Monarchy** (government), Chivalry (military) | Adopt a Tier 1 government |
 
 ## Renaissance era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Exploration | 130 | Mercenaries, Medieval Faires | **Merchant Republic** (government), Feudal Contract (military), Colonial Offices (economic) |
-| Humanism | 130 | Medieval Faires, Guilds | **Art Museum** |
-| Diplomatic Service | 130 | Guilds | Wisselbanken (economic) |
-| Reformed Church | 145 | Guilds, Divine Right | **Theocracy** (government) |
-| Mercantilism | 145 | Humanism | Triangular Trade (economic) |
-| The Enlightenment | 145 | Diplomatic Service | Rationalism (economic), Free Market (economic) |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Exploration | 165 | Mercenaries, Medieval Faires | **Merchant Republic** (government), Feudal Contract (military), Colonial Offices (economic) | Build a Harbor |
+| Humanism | 165 | Medieval Faires, Guilds | **Art Museum**, Château (France only) | Build an Amphitheater |
+| Diplomatic Service | 165 | Guilds | Wisselbanken (economic) | Make peace |
+| Reformed Church | 180 | Guilds, Divine Right | **Theocracy** (government) | Found 6 cities |
+| Mercantilism | 180 | Humanism | Triangular Trade (economic) | Build a Bank |
+| The Enlightenment | 180 | Diplomatic Service | Rationalism (economic), Free Market (economic) | Build 2 Universities |
 
 ## Industrial era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Colonialism | 170 | Mercantilism | Colonial Taxes (economic) |
-| Civil Engineering | 170 | Mercantilism | Public Works (economic) |
-| Nationalism | 170 | The Enlightenment | Grande Armée (military), National Identity (military) |
-| Opera and Ballet | 170 | The Enlightenment | Grand Opera (economic) |
-| Natural History | 185 | Colonialism | Theater Squares +1 Culture |
-| Scorched Earth | 185 | Nationalism | Scorched Earth (military) |
-| Urbanization | 185 | Civil Engineering, Nationalism | Public Transport (economic) |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Colonialism | 215 | Mercantilism | Colonial Taxes (economic) | Research Astronomy |
+| Civil Engineering | 215 | Mercantilism | Public Works (economic) | Have 8 districts |
+| Nationalism | 215 | The Enlightenment | Grande Armée (military), National Identity (military) | Go to war 2 times |
+| Opera and Ballet | 215 | The Enlightenment | Grand Opera (economic) | Build an Art Museum |
+| Natural History | 230 | Colonialism | Theater Squares +1 Culture | Explore 50% of the map |
+| Scorched Earth | 230 | Nationalism | Scorched Earth (military) | Train 2 Field Cannons |
+| Urbanization | 230 | Civil Engineering, Nationalism | Public Transport (economic) | Grow a city to 15 population |
 
 ## Modern era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Conservation | 205 | Natural History, Urbanization | Lumber Mills +1 Production |
-| Capitalism | 205 | Urbanization | Market Economy (economic), Economic Union (economic) |
-| Mass Media | 215 | Urbanization | Propaganda (wildcard) |
-| Mobilization | 215 | Urbanization | Levée en Masse (military), Military Research (military) |
-| Ideology | 230 | Mass Media, Mobilization | +1 Culture in every city |
-| Nuclear Program | 230 | Ideology | Research Grants (economic) |
-| Suffrage | 230 | Ideology | **Democracy** (government), New Deal (economic) |
-| Totalitarianism | 230 | Ideology | **Fascism** (government), Total War (military) |
-| Class Struggle | 230 | Ideology | **Communism** (government), Five-Year Plan (economic), Collectivization (economic) |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Conservation | 255 | Natural History, Urbanization | Lumber Mills +1 Production | Build 3 Theater Squares |
+| Capitalism | 255 | Urbanization | Market Economy (economic), Economic Union (economic) | Build 3 Banks |
+| Mass Media | 270 | Urbanization | Propaganda (wildcard) | Research Radio |
+| Mobilization | 270 | Urbanization | Levée en Masse (military), Military Research (military) | Have 15 military units |
+| Ideology | 290 | Mass Media, Mobilization | +1 Culture in every city | — |
+| Nuclear Program | 290 | Ideology | Research Grants (economic) | Build a Research Lab |
+| Suffrage | 290 | Ideology | **Democracy** (government), New Deal (economic) | Build 4 Sewers |
+| Totalitarianism | 290 | Ideology | **Fascism** (government), Total War (military) | Build 3 Military Academies |
+| Class Struggle | 290 | Ideology | **Communism** (government), Five-Year Plan (economic), Collectivization (economic) | Build 3 Factories |
 
 ## Atomic era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Cultural Heritage | 260 | Conservation | Heritage Tourism (wildcard) |
-| Cold War | 260 | Ideology | Military Organization (military) |
-| Professional Sports | 260 | Ideology | Sports Media (economic) |
-| Rapid Deployment | 275 | Cold War | Lightning Warfare (military), Force Modernization (military) |
-| Space Race | 275 | Cold War | +10% Science |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Cultural Heritage | 325 | Conservation | Heritage Tourism (wildcard), +50% Tourism | Reach 20 Tourism per turn |
+| Cold War | 325 | Ideology | Military Organization (military) | Research Nuclear Fission |
+| Professional Sports | 325 | Ideology | Sports Media (economic) | Grow a city to 20 population |
+| Rapid Deployment | 345 | Cold War | Lightning Warfare (military), Force Modernization (military) | Destroy 30 enemy units |
+| Space Race | 345 | Cold War | +10% Science | Research Rocketry |
 
 ## Information era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Globalization | 310 | Rapid Deployment, Space Race | Ecommerce (economic) |
-| Social Media | 310 | Professional Sports, Space Race | Online Communities (wildcard) |
-| Environmentalism | 310 | Cultural Heritage | +1 Food in every city |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Globalization | 390 | Rapid Deployment, Space Race | Ecommerce (economic) | Build 2 Stock Exchanges |
+| Social Media | 390 | Professional Sports, Space Race | Online Communities (wildcard), +25% Tourism | Research Telecommunications |
+| Environmentalism | 390 | Cultural Heritage | +1 Food in every city | Build 6 Lumber Mills |
 
 ## Future era
 
-| Civic | Cost | Needs | Unlocks |
-|---|---|---|---|
-| Near Future Governance | 350 | Globalization, Social Media | — |
-| Venture Politics | 380 | Near Future Governance | **Corporate Libertarianism** (government) |
-| Distributed Sovereignty | 380 | Near Future Governance | **Digital Democracy** (government) |
-| Optimization Imperative | 380 | Near Future Governance | **Synthetic Technocracy** (government) |
-| Information Warfare | 410 | Venture Politics | Every unit +3 strength |
-| Exodus Imperative | 410 | Optimization Imperative | +15% Science |
-| Smart Power Doctrine | 410 | Distributed Sovereignty | +15% Gold |
-| Cultural Hegemony | 450 | Smart Power Doctrine, Environmentalism | +25% Culture |
+| Civic | Cost | Needs | Unlocks | Inspiration |
+|---|---|---|---|---|
+| Near Future Governance | 440 | Globalization, Social Media | — | Reach 60 Tourism per turn |
+| Venture Politics | 475 | Near Future Governance | **Corporate Libertarianism** (government) | Have 2000 Gold |
+| Distributed Sovereignty | 475 | Near Future Governance | **Digital Democracy** (government) | Build 3 Broadcast Centers |
+| Optimization Imperative | 475 | Near Future Governance | **Synthetic Technocracy** (government) | Research Robotics |
+| Information Warfare | 515 | Venture Politics | Every unit +3 strength | Have 25 military units |
+| Exodus Imperative | 515 | Optimization Imperative | +15% Science | Research Satellites |
+| Smart Power Doctrine | 515 | Distributed Sovereignty | +15% Gold | Adopt a Tier 4 government |
+| Cultural Hegemony | 565 | Smart Power Doctrine, Environmentalism | +25% Culture | Reach 100 Tourism per turn |
 
-| Future Civic | 800 | Every other civic | Repeatable, +5 score each |
+| Future Civic | 800 | Every other civic | Repeatable, +5 score each | — |
 
 ## Effect glossary
 
@@ -267,10 +268,8 @@ Card, government and civic effects use the same fields as tech effects (see the 
 | Upgrades cost less | A discount on upgrading units |
 | Buying costs less | A discount when buying items with gold (Land Surveyors discounts tiles) |
 | Grow faster | Cities need less food to grow |
+| Tourism | Draws visitors from other civilizations toward a culture victory (see [victory-and-history.md](victory-and-history.md)) |
 
 ## Pacing targets
 
-- Civics move a little behind techs. In AI-vs-AI games on Normal, the leading civilization is in the Medieval civics era at turn 100 (Renaissance for techs), and has about three quarters of each tree by turn 150.
-- Policies and governments add a lot of science and production, so the tech costs from the Renaissance on were raised in 1.3 to keep the Epic 250-turn game's science victory near the end: on Normal the leader launches between turns 185 and 245, or doesn't finish in time.
-
-The AI-vs-AI soak test reports each game's tech and civics era at turn 100, and the costs above are tuned against it.
+Civics move a little behind techs. In AI-vs-AI games on Normal, the leading civilization is in the Renaissance or Industrial era of civics by turn 100, about level with its techs. The AI-vs-AI soak test reports each game's tech and civics era at turn 100, and the costs above are tuned against it.

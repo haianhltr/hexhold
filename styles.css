@@ -135,6 +135,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); }
 .yield { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .yield b { font: 600 14px var(--mono); }
 .yield small { font: 12px var(--mono); color: var(--muted); }
+.y-tourism .ic { color: #e7a8d8; }
 
 /* ---------- HUD ---------- */
 .hud { position: fixed; inset: 0; pointer-events: none; }
@@ -304,10 +305,18 @@ input[type="range"] { width: 100%; accent-color: var(--brass); }
 .setup-card h2 { font-size: 30px; }
 fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
 legend { padding: 0; margin-bottom: 8px; font: 600 11px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-.civ-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.civ-card { position: relative; display: grid; justify-items: center; gap: 4px; padding: 14px 8px 12px; border: 2px solid var(--line); border-radius: 12px; background: var(--raise); cursor: pointer; text-align: center; transition: border-color 0.15s; }
+.civ-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.civ-card { position: relative; display: grid; justify-items: center; gap: 3px; padding: 10px 6px 9px; border: 2px solid var(--line); border-radius: 12px; background: var(--raise); cursor: pointer; text-align: center; transition: border-color 0.15s; }
 .civ-card:hover { border-color: var(--line-2); }
-.civ-card b { font: 400 19px var(--display); }
+.civ-card b { font: 400 17px var(--display); }
+.civ-detail { margin-top: 12px; display: grid; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: #111a22; }
+.civ-detail-head { display: flex; gap: 12px; align-items: center; }
+.civ-detail-head b { display: block; font: 400 22px var(--display); color: var(--civ); }
+.civ-detail-head small { color: var(--muted); }
+.civ-traits { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 13.5px; }
+.civ-traits dt { font: 600 11px/1.9 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.civ-traits dd { margin: 0; color: var(--text); }
+.civ-traits dd b { color: var(--brass-hi); }
 .civ-card small { color: var(--muted); font-size: 12px; }
 .civ-card:has(input:checked) { border-color: var(--civ); background: color-mix(in srgb, var(--civ) 16%, var(--raise)); }
 .civ-card input, .choice-item input { position: absolute; opacity: 0; pointer-events: none; }
@@ -351,19 +360,39 @@ legend { padding: 0; margin-bottom: 8px; font: 600 11px var(--mono); letter-spac
 .tech-lines path.open { stroke: #6a8499; }
 .tech-lines path.queued { stroke: var(--brass); stroke-dasharray: 5 4; }
 .tech-lines path.done { stroke: #4f8a60; }
-.tech { position: absolute; display: grid; grid-template-rows: auto auto 1fr; gap: 4px; align-content: start; overflow: hidden; text-align: left; padding: 9px 11px 9px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line-2); color: var(--text); font: 14px var(--body); cursor: pointer; }
+.tech { position: absolute; display: grid; grid-template-rows: auto auto auto 1fr; gap: 3px; align-content: start; overflow: hidden; text-align: left; padding: 9px 11px 9px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line-2); color: var(--text); font: 14px var(--body); cursor: pointer; }
 .tech:hover:not(:disabled) { border-color: var(--science); }
 .tech-name { font-weight: 700; padding-right: 50px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tech-status { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tech-unlocks { display: flex; flex-wrap: wrap; gap: 4px; overflow: hidden; align-content: start; }
 .tech .chip { font-size: 11px; padding: 1px 7px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .tech.victory { border-color: #8f7bd0; }
+.tech-boost { display: flex; gap: 4px; align-items: center; min-width: 0; font-size: 11.5px; color: #8fa0ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tech-boost .ic { width: 12px; height: 12px; flex-shrink: 0; color: #6d7f8d; }
+.tech-boost-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tech-boost.got { color: var(--brass-hi); }
+.tech-boost.got .ic { color: var(--brass); }
 .tech.civic:hover:not(:disabled) { border-color: var(--culture); }
 .tech.civic.match { box-shadow: 0 0 0 2px var(--culture); }
 .tech-tools { flex-wrap: nowrap; justify-content: flex-end; align-items: center; min-width: 0; }
 .tech-tools .tech-search { flex: 0 1 260px; min-width: 120px; }
 .tech-tools .btn { flex-shrink: 0; }
 .gov-top { padding-right: 44px; align-items: flex-start; }
+
+/* History: victory progress and the timeline of historic moments. */
+.vp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 26px; }
+.vp p { margin: 0; }
+.vp-rows { display: grid; gap: 8px; }
+.vp-row { display: grid; grid-template-columns: minmax(110px, 150px) minmax(0, 1fr) minmax(120px, max-content); gap: 10px; align-items: center; font-size: 13.5px; }
+.vp-num { font: 12px var(--mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.who { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline { list-style: none; margin: 0; padding: 0; max-height: min(56vh, 520px); overflow: auto; border-top: 1px solid var(--line); }
+.moment { display: grid; grid-template-columns: 150px 20px minmax(0, 1fr) 36px; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.moment-when { font: 11.5px var(--mono); color: var(--muted); }
+.moment-icon .ic { width: 16px; height: 16px; color: var(--muted); }
+.moment-text .tag { color: var(--brass-hi); }
+.moment.world .moment-text { color: var(--brass-hi); }
+.moment-pts { font: 12px var(--mono); color: var(--good); text-align: right; }
 
 /* Government: policy slots, cards and governments. Military cards are red, economic gold,
    wildcard purple, as in the civics tree chips. */
@@ -471,8 +500,11 @@ table.keys tr + tr { border-top: 1px solid var(--line); }
   .unit-panel { width: calc(100vw - 24px); bottom: 150px; }
   .corner { width: 180px; }
   .minimap { display: none; }
-  .civ-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .civ-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .civ-traits { grid-template-columns: 1fr; }
   .setup-grid, .help-grid, .go-grid { grid-template-columns: 1fr; }
+  .vp-grid { grid-template-columns: 1fr; }
+  .moment { grid-template-columns: 90px 18px minmax(0, 1fr) 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

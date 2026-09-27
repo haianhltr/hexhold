@@ -142,6 +142,14 @@ async function main() {
   console.log('New game setup');
   await evaluate(`[...document.querySelectorAll('.title-actions button')].find(b => b.textContent === 'New game').click()`);
   await sleep(200);
+  const picker = await evaluate(`(() => {
+    const cards = document.querySelectorAll('.civ-card');
+    const egypt = [...cards].find((c) => c.textContent.includes('Egypt'));
+    egypt.click();
+    return { cards: cards.length, detail: document.querySelector('.civ-detail').textContent };
+  })()`);
+  console.log(`  ${picker.cards} civilizations to choose from; Egypt shows: ${picker.detail.slice(0, 80)}…`);
+  if (picker.cards !== 12 || !picker.detail.includes('Sphinx')) throw new Error('Civilization picker is incomplete');
   await shot('02-setup');
 
   console.log('Start a game and found the capital');
@@ -315,12 +323,28 @@ async function main() {
     return s.units[u.id].type;
   })()`);
   console.log(`  warrior became: ${upgraded}`);
-  if (upgraded !== 'swordsman') throw new Error('Upgrading a unit failed');
+  // The swordsman slot may hold a civilization's unique unit (Rome's Legion, Persia's Immortal).
+  if (!['swordsman', 'legion', 'immortal'].includes(upgraded)) throw new Error('Upgrading a unit failed');
 
   console.log('Diplomacy and help');
   await evaluate(`[...document.querySelectorAll('.tb-actions button')].find((b) => b.textContent === 'Diplomacy').click(); true`);
   await sleep(300);
   await shot('09-diplomacy');
+  await evaluate(`hexhold.closeModal(); true`);
+
+  console.log('History and victory progress');
+  const hist = await evaluate(`(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true }));
+    await new Promise((r) => setTimeout(r, 50));
+    const sections = document.querySelectorAll('.vp').length;
+    [...document.querySelectorAll('.history [role=tab]')].find((b) => b.textContent === 'Timeline').click();
+    await new Promise((r) => setTimeout(r, 50));
+    return { sections, moments: document.querySelectorAll('.timeline .moment').length, boosts: hexhold.human.eurekas.length + hexhold.human.inspirations.length };
+  })()`);
+  console.log(`  ${hist.sections} victory sections, ${hist.moments} historic moments, ${hist.boosts} Eurekas and Inspirations so far`);
+  if (hist.sections !== 4 || hist.moments < 2) throw new Error('History screen is incomplete');
+  await sleep(400);
+  await shot('09b-history');
   await evaluate(`hexhold.closeModal(); true`);
 
   console.log('Play to the end');
